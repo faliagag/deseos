@@ -1,19 +1,19 @@
 <?php
-// public/delete_giftlist.php
+// public/admin/delete_giftlist.php
 
-// Inicia la sesión solo si no está activa
+// Inicia la sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Incluir archivos necesarios
-require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../controllers/GiftListController.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../controllers/GiftListController.php';
+require_once __DIR__ . '/../../includes/auth.php';
 
-// Verificar que el usuario esté autenticado
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
+// Verificar que el usuario actual es administrador
+$auth = new Auth($pdo);
+if (!$auth->isAdmin()) {
+    header("Location: ../login.php");
     exit;
 }
 
@@ -29,7 +29,7 @@ $glc = new GiftListController($pdo);
 
 // Intentar eliminar la lista
 if ($glc->delete($id)) {
-    header("Location: dashboard.php");
+    header("Location: giftlists.php");
     exit;
 } else {
     echo "<div class='container mt-5'><div class='alert alert-danger'>Error al eliminar la lista de regalos.</div></div>";

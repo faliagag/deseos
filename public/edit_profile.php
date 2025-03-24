@@ -2,13 +2,25 @@
 require_once __DIR__ . "/../includes/db.php";
 require_once __DIR__ . "/../controllers/AuthController.php";
 require_once __DIR__ . "/../includes/auth.php";
-session_start();
-requireAuth();
-$user = $_SESSION["user"];
+
+// Iniciar sesión si no está activa
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Verificar autenticación usando la clase Auth
+$auth = new Auth($pdo);
+if (!$auth->check()) {
+    header("Location: login.php");
+    exit;
+}
+
+// Obtener datos del usuario
+$user = $auth->user();
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $auth = new AuthController($pdo);
-    $result = $auth->updateProfile($_POST, $user["id"]);
+    $authController = new AuthController($pdo);
+    $result = $authController->updateProfile($_POST, $user["id"]);
     if ($result["success"]) {
         $_SESSION["user"]["name"] = $_POST["name"];
         header("Location: dashboard.php");

@@ -1,7 +1,7 @@
 <?php
 // public/admin/users.php
 
-// Inicia la sesión solo si aún no está activa
+// Inicia la sesión solo si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,7 +11,8 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 // Verificar que el usuario actual es un administrador
-if (!isAdmin()) {
+$auth = new Auth($pdo);
+if (!$auth->isAdmin()) {
     header("Location: ../login.php");
     exit;
 }

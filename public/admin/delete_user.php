@@ -12,7 +12,8 @@ require_once __DIR__ . '/../../controllers/AdminController.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 // Verificar que el usuario actual es administrador
-if (!isAdmin()) {
+$auth = new Auth($pdo);
+if (!$auth->isAdmin()) {
     header("Location: ../login.php");
     exit;
 }

@@ -9,25 +9,15 @@ if (session_status() === PHP_SESSION_NONE) {
 // Incluir archivos necesarios (ajusta las rutas según tu estructura)
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../controllers/AdminController.php';
-require_once __DIR__ . '/../../includes/auth.php';  // Aquí está la función isAdmin()
+require_once __DIR__ . '/../../includes/auth.php';  // Aquí está la clase Auth
 
 // Verificar que el usuario actual es administrador
-// Primero, asegurémonos de que la función isAdmin() existe
-if (!function_exists('isAdmin')) {
-    // Definición alternativa si no existe
-    function isAdmin() {
-        return isset($_SESSION['user']) && isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin';
-    }
-}
-
-// Ahora verificamos si es admin
-if (!isAdmin()) {
+// Creamos una instancia de Auth y verificamos con el método isAdmin()
+$auth = new Auth($pdo);
+if (!$auth->isAdmin()) {
     header("Location: ../login.php");
     exit;
 }
-
-// Continuar con el resto del código...
-// ...
 
 // Instanciar el controlador administrativo
 $admin = new AdminController($pdo);
@@ -36,48 +26,6 @@ $admin = new AdminController($pdo);
 $users        = $admin->listUsers();             // Gestión de Usuarios
 $giftLists    = $admin->listGiftLists();           // Gestión de Listas
 $transactions = $admin->listTransactions();        // Transacciones
-
-// Datos de ejemplo para Productos (en un sistema real, se consultaría a un ProductController)
-$products = [
-    [
-        "id"       => 101,
-        "name"     => "Cafetera Espresso",
-        "category" => "Electrodomésticos",
-        "price"    => 149.99,
-        "stock"    => 10
-    ],
-    [
-        "id"       => 102,
-        "name"     => "Juego de Cuchillos",
-        "category" => "Cocina",
-        "price"    => 89.99,
-        "stock"    => 20
-    ]
-];
-
-// Datos de ejemplo para Moderación de Contenido
-$comments = [
-    [
-        "id"      => 1,
-        "user"    => "Carlos",
-        "content" => "Comentario inapropiado",
-        "status"  => "pendiente"
-    ],
-    [
-        "id"      => 2,
-        "user"    => "Laura",
-        "content" => "Comentario positivo",
-        "status"  => "aprobado"
-    ]
-];
-
-// Datos de ejemplo para Configuración del Sitio (placeholder)
-$siteConfig = [
-    "logo"            => "logo.png",
-    "color_theme"     => "Azul",
-    "payment_methods" => "Tarjeta, PayPal",
-    "shipping_options"=> "Envío estándar, Express"
-];
 
 // Datos de ejemplo para Reportes y Estadísticas
 $reportMetrics = [
@@ -108,12 +56,6 @@ $reportMetrics = [
           Gestión de Usuarios
         </button>
       </li>
-      <!-- Gestión de Productos -->
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab" aria-controls="products" aria-selected="false">
-          Gestión de Productos
-        </button>
-      </li>
       <!-- Gestión de Listas -->
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="lists-tab" data-bs-toggle="tab" data-bs-target="#lists" type="button" role="tab" aria-controls="lists" aria-selected="false">
@@ -132,18 +74,6 @@ $reportMetrics = [
           Transacciones
         </button>
       </li>
-      <!-- Moderación de Contenido -->
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="moderation-tab" data-bs-toggle="tab" data-bs-target="#moderation" type="button" role="tab" aria-controls="moderation" aria-selected="false">
-          Moderación de Contenido
-        </button>
-      </li>
-      <!-- Configuración del Sitio -->
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="configuration-tab" data-bs-toggle="tab" data-bs-target="#configuration" type="button" role="tab" aria-controls="configuration" aria-selected="false">
-          Configuración del Sitio
-        </button>
-      </li>
       <!-- Reportes y Estadísticas -->
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab" aria-controls="reports" aria-selected="false">
@@ -155,7 +85,16 @@ $reportMetrics = [
     <div class="tab-content mt-3" id="adminTabsContent">
       <!-- Gestión de Usuarios -->
       <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
-        <h3>Gestión de Usuarios</h3>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3>Gestión de Usuarios</h3>
+          <a href="users.php" class="btn btn-primary">Gestión completa de usuarios</a>
+        </div>
+        
+        <div class="alert alert-info">
+          <strong>Nota:</strong> Esta es una vista resumida. Para una gestión completa de usuarios, incluyendo búsqueda, filtrado y más opciones, 
+          por favor vaya a la página de <a href="users.php" class="alert-link">Gestión de Usuarios</a>.
+        </div>
+        
         <table class="table table-bordered">
           <thead>
             <tr>
@@ -168,7 +107,11 @@ $reportMetrics = [
           </thead>
           <tbody>
             <?php if (!empty($users)): ?>
-              <?php foreach ($users as $u): ?>
+              <?php 
+              // Mostrar solo los primeros 5 usuarios en el dashboard para no sobrecargarlo
+              $limitedUsers = array_slice($users, 0, 5); 
+              foreach ($limitedUsers as $u): 
+              ?>
                 <tr>
                   <td><?php echo $u['id']; ?></td>
                   <td><?php echo htmlspecialchars($u['name'] . " " . $u['lastname']); ?></td>
@@ -180,6 +123,13 @@ $reportMetrics = [
                   </td>
                 </tr>
               <?php endforeach; ?>
+              <?php if (count($users) > 5): ?>
+                <tr>
+                  <td colspan="5" class="text-center">
+                    <a href="users.php" class="btn btn-outline-primary btn-sm">Ver todos los usuarios (<?php echo count($users); ?> en total)</a>
+                  </td>
+                </tr>
+              <?php endif; ?>
             <?php else: ?>
               <tr>
                 <td colspan="5"><div class="alert alert-info">No se encontraron usuarios.</div></td>
@@ -187,12 +137,6 @@ $reportMetrics = [
             <?php endif; ?>
           </tbody>
         </table>
-      </div>
-      
-      <!-- Gestión de Productos (Placeholder) -->
-      <div class="tab-pane fade" id="products" role="tabpanel" aria-labelledby="products-tab">
-        <h3>Gestión de Productos</h3>
-        <div class="alert alert-info">Sección en construcción: gestión de productos.</div>
       </div>
       
       <!-- Gestión de Listas -->
@@ -277,48 +221,6 @@ $reportMetrics = [
             <?php endif; ?>
           </tbody>
         </table>
-      </div>
-      
-      <!-- Moderación de Contenido -->
-      <div class="tab-pane fade" id="moderation" role="tabpanel" aria-labelledby="moderation-tab">
-        <h3>Moderación de Contenido</h3>
-        <?php if (!empty($comments)): ?>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Contenido</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($comments as $c): ?>
-                <tr>
-                  <td><?php echo $c['id']; ?></td>
-                  <td><?php echo htmlspecialchars($c['user']); ?></td>
-                  <td><?php echo htmlspecialchars($c['content']); ?></td>
-                  <td><?php echo htmlspecialchars($c['status']); ?></td>
-                  <td>
-                    <a href="approve_comment.php?id=<?php echo $c['id']; ?>" class="btn btn-sm btn-success">Aprobar</a>
-                    <a href="delete_comment.php?id=<?php echo $c['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este comentario?');">Eliminar</a>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        <?php else: ?>
-          <div class="alert alert-info">No hay comentarios pendientes.</div>
-        <?php endif; ?>
-      </div>
-      
-      <!-- Configuración del Sitio -->
-      <div class="tab-pane fade" id="configuration" role="tabpanel" aria-labelledby="configuration-tab">
-        <h3>Configuración del Sitio</h3>
-        <div class="alert alert-info">
-          Sección de configuración en construcción.
-        </div>
       </div>
       
       <!-- Reportes y Estadísticas -->

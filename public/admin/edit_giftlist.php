@@ -1,5 +1,5 @@
 <?php
-// public/edit_giftlist.php
+// public/admin/edit_giftlist.php
 
 // Inicia la sesión solo si no está activa
 if (session_status() === PHP_SESSION_NONE) {
@@ -7,13 +7,14 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Incluir archivos necesarios
-require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../controllers/GiftListController.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../controllers/GiftListController.php';
+require_once __DIR__ . '/../../includes/auth.php';
 
-// Verifica que el usuario esté autenticado
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
+// Verificar que el usuario actual es administrador
+$auth = new Auth($pdo);
+if (!$auth->isAdmin()) {
+    header("Location: ../login.php");
     exit;
 }
 
@@ -83,7 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <textarea name="description" class="form-control" required><?php echo htmlspecialchars($list['description']); ?></textarea>
             </div>
             <button type="submit" class="btn btn-primary">Actualizar Lista</button>
-            <a href="dashboard.php" class="btn btn-secondary">Volver al Dashboard</a>
+            <a href="giftlists.php" class="btn btn-secondary">Volver a Listas</a>
         </form>
     </div>
     <!-- Bootstrap Bundle JS (CDN) -->
