@@ -1,0 +1,103 @@
+/* Admin Theme */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f7f7f7;
+}
+
+/* Sidebar */
+.admin-sidebar {
+    background-color: #343a40;
+    min-height: calc(100vh - 56px);
+    padding-top: 20px;
+}
+
+.admin-sidebar .nav-link {
+    color: rgba(255,255,255,.75);
+    padding: 10px 20px;
+    margin-bottom: 5px;
+}
+
+.admin-sidebar .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255,255,255,.1);
+}
+
+.admin-sidebar .nav-link.active {
+    color: #fff;
+    background-color: rgba(255,255,255,.2);
+}
+
+/* Content Area */
+.admin-content {
+    padding: 20px;
+}
+
+.admin-card {
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,.1);
+    margin-bottom: 20px;
+}
+
+.admin-card .card-header {
+    background-color: #343a40;
+    color: white;
+    border-radius: 5px 5px 0 0;
+}
+
+/* Tables */
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.admin-table th {
+    background-color: #343a40;
+    color: white;
+    padding: 10px;
+}
+
+.admin-table td {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.admin-table tr:hover {
+    background-color: rgba(0,0,0,.05);
+}
+
+/* Stats Widgets */
+.admin-stat {
+    background-color: white;
+    border-radius: 5px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,.1);
+    margin-bottom: 20px;
+}
+
+.admin-stat h3 {
+    font-size: 2rem;
+    margin: 0;
+}
+
+.admin-stat p {
+    color: #6c757d;
+    margin: 5px 0 0;
+}
+
+.admin-stat.primary {
+    border-top: 3px solid #007bff;
+}
+
+.admin-stat.success {
+    border-top: 3px solid #28a745;
+}
+
+.admin-stat.warning {
+    border-top: 3px solid #ffc107;
+}
+
+.admin-stat.danger {
+    border-top: 3px solid #dc3545;
+}

@@ -9,13 +9,25 @@ if (session_status() === PHP_SESSION_NONE) {
 // Incluir archivos necesarios (ajusta las rutas según tu estructura)
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../controllers/AdminController.php';
-require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/auth.php';  // Aquí está la función isAdmin()
 
 // Verificar que el usuario actual es administrador
+// Primero, asegurémonos de que la función isAdmin() existe
+if (!function_exists('isAdmin')) {
+    // Definición alternativa si no existe
+    function isAdmin() {
+        return isset($_SESSION['user']) && isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin';
+    }
+}
+
+// Ahora verificamos si es admin
 if (!isAdmin()) {
     header("Location: ../login.php");
     exit;
 }
+
+// Continuar con el resto del código...
+// ...
 
 // Instanciar el controlador administrativo
 $admin = new AdminController($pdo);

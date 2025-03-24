@@ -4,6 +4,14 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../models/User.php';
 
+// Asegúrate de que estas funciones sean definidas o incluidas
+if (!function_exists('error_log')) {
+    function error_log($message) {
+        // Implementación básica si no existe
+        file_put_contents('error_log.txt', $message . "\n", FILE_APPEND);
+    }
+}
+
 class AuthController {
     private $pdo;
     private $userModel;
@@ -13,19 +21,14 @@ class AuthController {
         $this->userModel = new User($pdo);
     }
 
-    /**
-     * Realiza el proceso de login.
-     * Si las credenciales son correctas, inicia la sesión y redirige según el rol del usuario.
-     *
-     * @param array $data Contiene 'email' y 'password'
-     * @return array Si falla, retorna ['success' => false, 'message' => '...'].
-     */
+    // Método login simplificado para depuración
     public function login($data) {
+        // Validar datos de entrada
         if (!isset($data['email']) || !isset($data['password'])) {
-            return ['success' => false, 'message' => 'Faltan credenciales'];
+            return ['success' => false, 'message' => 'Email y contraseña son obligatorios'];
         }
 
-        // Intenta obtener el usuario a través del modelo
+        // Intentar obtener el usuario a través del modelo
         $user = $this->userModel->login($data['email'], $data['password']);
 
         if ($user) {
@@ -33,10 +36,14 @@ class AuthController {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            // Guarda los datos del usuario en la sesión
+            
+            // Limpiar datos sensibles antes de guardar en sesión
+            unset($user['password']);
+            
+            // Guardar los datos del usuario en la sesión
             $_SESSION['user'] = $user;
-
-            // Redirecciona según el rol del usuario
+            
+            // Redireccionar según el rol del usuario
             if (isset($user['role']) && $user['role'] === 'admin') {
                 header("Location: admin/dashboard.php");
                 exit;
@@ -48,6 +55,4 @@ class AuthController {
             return ['success' => false, 'message' => 'Credenciales incorrectas'];
         }
     }
-    
-    // Otros métodos (register, updateProfile, etc.) se definen aquí...
 }

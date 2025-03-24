@@ -27,6 +27,10 @@ try {
         user_id INT NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        event_type VARCHAR(50) DEFAULT NULL,
+        beneficiary1 VARCHAR(255) DEFAULT NULL,
+        beneficiary2 VARCHAR(255) DEFAULT NULL,
+        preset_theme INT DEFAULT NULL,
         unique_link VARCHAR(255) NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -58,6 +62,22 @@ try {
         FOREIGN KEY (gift_list_id) REFERENCES gift_lists(id) ON DELETE CASCADE,
         FOREIGN KEY (gift_id) REFERENCES gifts(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    
+    CREATE TABLE IF NOT EXISTS preset_product_lists (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        theme VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS preset_products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        preset_list_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) DEFAULT 0,
+        stock INT DEFAULT 0,
+        FOREIGN KEY (preset_list_id) REFERENCES preset_product_lists(id) ON DELETE CASCADE
     );
     ";
     $pdo->exec($sql);
