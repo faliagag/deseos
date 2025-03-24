@@ -34,17 +34,22 @@ class GiftListController {
                 throw new Exception("Faltan datos requeridos (título)");
             }
             
-            $preset_theme = isset($data["preset_theme"]) ? $data["preset_theme"] : null;
+            // Generar un unique_link único
+            $unique_link = $this->generateUniqueLink();
             
-            $result = $this->giftListModel->create(
+            // Adaptado para funcionar con la estructura actual de la base de datos
+            // que solo tiene title, description, unique_link y user_id
+            $stmt = $this->pdo->prepare("
+                INSERT INTO gift_lists (user_id, title, description, unique_link, created_at) 
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            
+            $result = $stmt->execute([
                 $user_id,
                 $data["title"],
                 $data["description"],
-                $data["event_type"] ?? null,
-                $data["beneficiary1"] ?? null,
-                $data["beneficiary2"] ?? null,
-                $preset_theme
-            );
+                $unique_link
+            ]);
             
             if (!$result) {
                 ErrorHandler::logError("Error al crear lista de regalos", [
@@ -114,16 +119,11 @@ class GiftListController {
                 throw new Exception("El título es obligatorio");
             }
             
-            $preset_theme = isset($data["preset_theme"]) ? $data["preset_theme"] : null;
-            
+            // Adaptado a la estructura actual de la base de datos
             $result = $this->giftListModel->update(
                 $id,
                 $data["title"],
-                $data["description"] ?? '',
-                $data["event_type"] ?? null,
-                $data["beneficiary1"] ?? null,
-                $data["beneficiary2"] ?? null,
-                $preset_theme
+                $data["description"] ?? ''
             );
             
             if (!$result) {
@@ -195,18 +195,27 @@ class GiftListController {
             $price = isset($data['price']) ? floatval($data['price']) : 0;
             $stock = isset($data['stock']) ? intval($data['stock']) : 0;
             
-            $result = $this->giftModel->create(
+            error_log("Agregando regalo: " . print_r($data, true));
+            
+            // Usar directamente la consulta SQL para mejor control
+            $stmt = $this->pdo->prepare("
+                INSERT INTO gifts (gift_list_id, name, description, price, stock, sold, contributed, created_at)
+                VALUES (?, ?, ?, ?, ?, 0, 0, NOW())
+            ");
+            
+            $result = $stmt->execute([
                 $gift_list_id,
                 $data["name"],
-                isset($data["description"]) ? $data["description"] : "",
+                $data["description"] ?? "",
                 $price,
                 $stock
-            );
+            ]);
             
             if (!$result) {
                 ErrorHandler::logError("Error al agregar regalo", [
                     'gift_list_id' => $gift_list_id,
-                    'data' => $data
+                    'data' => $data,
+                    'error' => $stmt->errorInfo()
                 ]);
             }
             
@@ -265,5 +274,26 @@ class GiftListController {
             ErrorHandler::handleException($e);
             return [];
         }
+    }
+    
+    /**
+     * Genera un enlace único para una lista.
+     *
+     * @return string Enlace único.
+     */
+    private function generateUniqueLink() {
+        // Generar un enlace único simple de 10 caracteres
+        $unique = substr(md5(uniqid(rand(), true)), 0, 10);
+        
+        // Verificar que no existe ya en la base de datos
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM gift_lists WHERE unique_link = ?");
+        $stmt->execute([$unique]);
+        
+        // Si ya existe, generar otro
+        if ($stmt->fetchColumn() > 0) {
+            return $this->generateUniqueLink();
+        }
+        
+        return $unique;
     }
 }

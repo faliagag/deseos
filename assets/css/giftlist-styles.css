@@ -1,0 +1,74 @@
+/* Estilos personalizados para GiftList App */
+
+/* Estilos para las tarjetas de productos */
+.product-group, .product-custom-group {
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.product-group:hover, .product-custom-group:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+/* Estilos para los totales */
+.total-field, .total-field-custom {
+    font-weight: bold;
+    background-color: #e9f7fe !important;
+    color: #0d6efd;
+    text-align: right;
+    border-left: 4px solid #0d6efd;
+}
+
+#grand_total {
+    font-size: 1.25rem;
+    font-weight: bold;
+    background-color: #ecffec !important;
+    color: #198754;
+    text-align: right;
+    border-left: 4px solid #198754;
+}
+
+/* Estilos para los botones de acción */
+.remove-product, .remove-custom-product {
+    transition: all 0.2s ease;
+}
+
+.remove-product:hover, .remove-custom-product:hover {
+    transform: scale(1.05);
+}
+
+/* Estilos para los campos de entrada */
+.form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+input[type="number"] {
+    text-align: right;
+}
+
+/* Estilos para los encabezados de sección */
+.card-header {
+    font-weight: bold;
+    border-radius: 6px 6px 0 0 !important;
+    background-color: #0d6efd;
+    color: white;
+}
+
+.card {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+}
+
+/* Estilo para la sección de resumen */
+.card-header.bg-success {
+    background-color: #198754 !important;
+}

@@ -1,6 +1,11 @@
 <?php
 // public/create_giftlist.php
 
+// Activar reporte de errores para depuración
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -31,6 +36,9 @@ $error = "";
 $success = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Para depuración
+    error_log("POST data: " . print_r($_POST, true));
+    
     // Verificar token CSRF
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = "Error de verificación. Por favor, recargue la página.";
@@ -40,10 +48,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // Recopilar datos generales de la lista
         $data = [
             'title'         => trim($_POST['title'] ?? ''),
-            'description'   => trim($_POST['description'] ?? ''),
-            'event_type'    => trim($_POST['event_type'] ?? ''),
-            'beneficiary1'  => trim($_POST['beneficiary1'] ?? ''),
-            'beneficiary2'  => trim($_POST['beneficiary2'] ?? '')
+            'description'   => trim($_POST['description'] ?? '')
+            // Nota: Removidos los campos que no existen en la estructura actual de la BD
         ];
         
         // Validaciones básicas
@@ -54,24 +60,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } else {
             $list_type = $_POST['list_type'] ?? 'predeterminada';
             
-// Si es lista predeterminada, se debe enviar el ID del preset
-            if ($list_type === 'predeterminada') {
-                $data['preset_theme'] = trim($_POST['preset_theme'] ?? '');
-                if (empty($data['preset_theme'])) {
-                    $error = "Debe seleccionar un temario para la lista predeterminada.";
-                }
-            } else {
-                $data['preset_theme'] = null;
-            }
-            
             if (empty($error)) {
                 // Crear la lista usando el controlador y obtener el ID numérico
                 try {
+                    // Intentamos llamar al método create y capturamos cualquier excepción
                     $gift_list_id = $glc->create($data, $user["id"]);
                     
                     if (!$gift_list_id) {
                         $error = "No se pudo crear la lista. Verifica que todos los campos sean correctos.";
+                        // Mostrar más detalles para depurar
+                        error_log("Error creando lista: " . print_r($data, true));
                     } else {
+                        $productsAdded = 0; // Para contar los productos añadidos
+                        
                         // Procesar productos según el tipo de lista
                         if ($list_type === 'predeterminada') {
                             if (isset($_POST['product_id']) && is_array($_POST['product_id'])) {
@@ -79,18 +80,57 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty($presetProductId)) {
                                         $price = floatval($_POST['price'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity'][$index] ?? 0);
-                                        // Consultar el nombre real del producto desde la tabla preset_products
-                                        $stmtProd = $pdo->prepare("SELECT name FROM preset_products WHERE id = ?");
-                                        $stmtProd->execute([$presetProductId]);
-                                        $presetProd = $stmtProd->fetch(PDO::FETCH_ASSOC);
-                                        $name = $presetProd ? $presetProd['name'] : "";
-                                        // Insertar el producto en la lista (como copia para el usuario)
-                                        $glc->addGift($gift_list_id, [
+                                        
+                                        // Si es un producto personalizado en lista predeterminada
+                                        if ($presetProductId === 'custom') {
+                                            // Asegúrate de que product_name_custom existe para este índice
+                                            if (isset($_POST['product_name_custom']) && 
+                                                is_array($_POST['product_name_custom']) && 
+                                                isset($_POST['product_name_custom'][$index])) {
+                                                
+                                                $name = trim($_POST['product_name_custom'][$index]);
+                                                error_log("Procesando producto personalizado en lista predeterminada: $name");
+                                            } else {
+                                                // Si no está en product_name_custom, busca en otro lugar
+                                                // En caso de que la estructura de datos sea diferente
+                                                $customIndex = $index - count($_POST['product_id']) + count($_POST['product_name_custom']);
+                                                if (isset($_POST['product_name_custom']) && 
+                                                    is_array($_POST['product_name_custom']) && 
+                                                    isset($_POST['product_name_custom'][$customIndex])) {
+                                                    
+                                                    $name = trim($_POST['product_name_custom'][$customIndex]);
+                                                    error_log("Procesando producto personalizado (índice ajustado): $name");
+                                                } else {
+                                                    // Si todo falla, usa un nombre predeterminado
+                                                    $name = "Producto personalizado";
+                                                    error_log("No se pudo encontrar el nombre del producto personalizado para el índice $index");
+                                                }
+                                            }
+                                            $description = '';
+                                        } else {
+                                            // Consultar el nombre real del producto desde la tabla preset_products
+                                            $stmtProd = $pdo->prepare("SELECT name FROM preset_products WHERE id = ?");
+                                            $stmtProd->execute([$presetProductId]);
+                                            $presetProd = $stmtProd->fetch(PDO::FETCH_ASSOC);
+                                            $name = $presetProd ? $presetProd['name'] : "";
+                                            $description = '';
+                                            error_log("Procesando producto predeterminado: $name");
+                                        }
+                                        
+                                        // Insertar el producto en la lista
+                                        $result = $glc->addGift($gift_list_id, [
                                             "name"        => $name,
-                                            "description" => "",
+                                            "description" => $description,
                                             "price"       => $price,
                                             "stock"       => $quantity
                                         ]);
+                                        
+                                        if ($result) {
+                                            $productsAdded++;
+                                            error_log("Producto añadido: $name, precio: $price, cantidad: $quantity");
+                                        } else {
+                                            error_log("Error al añadir regalo: $name, precio: $price, cantidad: $quantity");
+                                        }
                                     }
                                 }
                             }
@@ -100,24 +140,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty(trim($prod_name))) {
                                         $price = floatval($_POST['price_custom'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity_custom'][$index] ?? 0);
-                                        $glc->addGift($gift_list_id, [
+                                        
+                                        $result = $glc->addGift($gift_list_id, [
                                             "name"        => trim($prod_name),
                                             "description" => "",
                                             "price"       => $price,
                                             "stock"       => $quantity
                                         ]);
+                                        
+                                        if ($result) {
+                                            $productsAdded++;
+                                            error_log("Producto personalizado añadido: $prod_name, precio: $price, cantidad: $quantity");
+                                        } else {
+                                            error_log("Error al añadir regalo personalizado: $prod_name, precio: $price, cantidad: $quantity");
+                                        }
                                     }
                                 }
                             }
                         }
                         
+                        error_log("Total de productos añadidos: $productsAdded");
+                        
                         // Establecer mensaje flash y redirigir
-                        set_flash_message('success', 'Lista de regalos creada exitosamente');
+                        set_flash_message('success', 'Lista de regalos creada exitosamente con ' . $productsAdded . ' productos.');
                         header("Location: dashboard.php");
                         exit;
                     }
                 } catch (Exception $e) {
                     $error = "Error al crear la lista: " . $e->getMessage();
+                    // Registra el error en el log
+                    error_log("Excepción creando lista: " . $e->getMessage());
                 }
             }
         }
@@ -206,31 +258,6 @@ $title = "Crear Lista de Regalos";
                         <textarea id="description" name="description" class="form-control" rows="3" required></textarea>
                         <div class="invalid-feedback">La descripción es obligatoria</div>
                     </div>
-                    
-                    <!-- Tipo de Evento y Beneficiarios -->
-                    <div class="mb-3">
-                        <label for="event_type" class="form-label">Tipo de Evento:</label>
-                        <select id="event_type" name="event_type" class="form-select">
-                            <option value="">Seleccione un tipo de evento</option>
-                            <option value="Cumpleaños">Cumpleaños</option>
-                            <option value="Bautizo">Bautizo</option>
-                            <option value="Babyshower">Babyshower</option>
-                            <option value="Matrimonio">Matrimonio</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3" id="beneficiarySingle">
-                        <label for="beneficiary1" class="form-label">Nombre del Beneficiario:</label>
-                        <input type="text" id="beneficiary1" name="beneficiary1" class="form-control">
-                    </div>
-                    
-                    <div class="mb-3 d-none" id="beneficiaryDouble">
-                        <label for="beneficiary1_double" class="form-label">Nombre del Beneficiario 1:</label>
-                        <input type="text" id="beneficiary1_double" name="beneficiary1" class="form-control mb-2">
-                        <label for="beneficiary2" class="form-label">Nombre del Beneficiario 2:</label>
-                        <input type="text" id="beneficiary2" name="beneficiary2" class="form-control">
-                    </div>
                 </div>
             </div>
             
@@ -260,6 +287,13 @@ $title = "Crear Lista de Regalos";
                         </div>
                         <!-- Contenedor para productos predeterminados, se cargan desde get_preset_products.php vía AJAX -->
                         <div id="preset_products_container" class="mt-4"></div>
+                        
+                        <!-- Botón para agregar productos adicionales a la lista predeterminada -->
+                        <div class="mt-3">
+                            <button type="button" id="add_preset_product" class="btn btn-outline-secondary mb-3">
+                                <i class="bi bi-plus"></i> Agregar producto adicional
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- Sección para Lista Personalizada -->
@@ -326,209 +360,325 @@ $title = "Crear Lista de Regalos";
 
     <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Script directo integrado -->
     <script>
-        // Mostrar u ocultar secciones según el tipo de lista
-        document.getElementById('list_type').addEventListener('change', function() {
-            var listType = this.value;
-            if (listType === 'predeterminada') {
-                document.getElementById('predeterminada_section').classList.remove('d-none');
-                document.getElementById('personalizada_section').classList.add('d-none');
-            } else {
-                document.getElementById('predeterminada_section').classList.add('d-none');
-                document.getElementById('personalizada_section').classList.remove('d-none');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Referencias a elementos DOM
+        const listTypeSelect = document.getElementById('list_type');
+        const presetSection = document.getElementById('predeterminada_section');
+        const customSection = document.getElementById('personalizada_section');
+        const presetThemeSelect = document.getElementById('preset_theme');
+        const presetProductsContainer = document.getElementById('preset_products_container');
+        const customProductsContainer = document.getElementById('custom_products_container');
+        const addCustomProductBtn = document.getElementById('add_custom_product');
+        const addPresetProductBtn = document.getElementById('add_preset_product');
+        const grandTotalElement = document.getElementById('grand_total');
+        
+        // Inicialización
+        initApp();
+        
+        /**
+         * Inicializa la aplicación y configura los event listeners
+         */
+        function initApp() {
+            console.log("Inicializando aplicación de listas de regalos...");
+            
+            // Event listeners para cambios de tipo de lista
+            listTypeSelect.addEventListener('change', handleListTypeChange);
+            
+            // Event listener para selección de tema predeterminado
+            if (presetThemeSelect) {
+                presetThemeSelect.addEventListener('change', function() {
+                    console.log("Cambiando preset a: " + this.value);
+                    loadPresetProducts(this.value);
+                });
             }
+            
+            // Event listener para agregar producto personalizado
+            if (addCustomProductBtn) {
+                addCustomProductBtn.addEventListener('click', addCustomProduct);
+            }
+            
+            // Event listener para agregar producto a lista predeterminada
+            if (addPresetProductBtn) {
+                addPresetProductBtn.addEventListener('click', addPresetProduct);
+            }
+            
+            // Event listeners para eliminar productos
+            if (customProductsContainer) {
+                customProductsContainer.addEventListener('click', function(e) {
+                    if (e.target && e.target.matches('.remove-custom-product')) {
+                        removeCustomProduct(e);
+                    }
+                });
+            }
+            
+            if (presetProductsContainer) {
+                presetProductsContainer.addEventListener('click', function(e) {
+                    if (e.target && e.target.matches('.remove-product')) {
+                        removePresetProduct(e);
+                    }
+                });
+            }
+            
+            // Event listener global para cambios en inputs de precio o cantidad
+            document.addEventListener('input', function(e) {
+                if (e.target.matches('input[name="price_custom[]"], input[name="quantity_custom[]"]')) {
+                    calculateTotalsCustom();
+                    calculateGrandTotal();
+                }
+                if (e.target.matches('input[name="price[]"], input[name="quantity[]"]')) {
+                    calculateTotalsPreset();
+                    calculateGrandTotal();
+                }
+            });
+            
+            // Inicializar el estado actual
+            handleListTypeChange();
+        }
+        
+        /**
+         * Maneja el cambio entre tipos de lista (predeterminada/personalizada)
+         */
+        function handleListTypeChange() {
+            const listType = listTypeSelect.value;
+            console.log("Cambiando tipo de lista a: " + listType);
+            
+            if (listType === 'predeterminada') {
+                presetSection.classList.remove('d-none');
+                customSection.classList.add('d-none');
+            } else {
+                presetSection.classList.add('d-none');
+                customSection.classList.remove('d-none');
+            }
+            
             calculateGrandTotal();
-        });
-        
-        // Mostrar u ocultar beneficiarios según el tipo de evento (Matrimonio)
-        document.querySelector('select[name="event_type"]').addEventListener('change', function() {
-            var eventType = this.value;
-            var beneficiarySingle = document.getElementById('beneficiarySingle');
-            var beneficiaryDouble = document.getElementById('beneficiaryDouble');
-            if (eventType === "Matrimonio") {
-                beneficiarySingle.classList.add('d-none');
-                beneficiaryDouble.classList.remove('d-none');
-            } else {
-                beneficiarySingle.classList.remove('d-none');
-                beneficiaryDouble.classList.add('d-none');
-            }
-        });
-        
-        // Funciones para productos personalizados
-        function calculateTotalsCustom() {
-            document.querySelectorAll('.product-custom-group').forEach(function(group, index) {
-                var price = parseFloat(group.querySelector('input[name="price_custom[]"]').value) || 0;
-                var quantity = parseFloat(group.querySelector('input[name="quantity_custom[]"]').value) || 0;
-                var total = price * quantity;
-                group.querySelector('.total-field-custom').textContent = total.toFixed(2);
-            });
         }
         
-        function calculateGrandTotalCustom() {
-            var grandTotal = 0;
-            document.querySelectorAll('.product-custom-group').forEach(function(group) {
-                var total = parseFloat(group.querySelector('.total-field-custom').textContent) || 0;
-                grandTotal += total;
-            });
-            document.getElementById('grand_total').textContent = grandTotal.toFixed(2);
-        }
-        
-        // Funciones para productos predeterminados
-        function calculateTotalsPreset() {
-            document.querySelectorAll('.product-group').forEach(function(group) {
-                var price = parseFloat(group.querySelector('input[name="price[]"]').value) || 0;
-                var quantity = parseFloat(group.querySelector('input[name="quantity[]"]').value) || 0;
-                var total = price * quantity;
-                group.querySelector('.total-field').textContent = total.toFixed(2);
-            });
-        }
-        
-        function calculateGrandTotalPreset() {
-            var grandTotal = 0;
-            document.querySelectorAll('.product-group').forEach(function(group) {
-                var total = parseFloat(group.querySelector('.total-field').textContent) || 0;
-                grandTotal += total;
-            });
-            document.getElementById('grand_total').textContent = grandTotal.toFixed(2);
-        }
-        
-        function calculateGrandTotal() {
-            var listType = document.getElementById('list_type').value;
-            if (listType === 'predeterminada') {
-                calculateTotalsPreset();
-                calculateGrandTotalPreset();
-            } else {
-                calculateTotalsCustom();
-                calculateGrandTotalCustom();
-            }
-        }
-        
-        // Actualizar totales al modificar precio o cantidad
-        document.addEventListener('input', function(e) {
-            if (e.target.matches('input[name="price_custom[]"], input[name="quantity_custom[]"]')) {
-                calculateTotalsCustom();
-                calculateGrandTotalCustom();
-            }
-            if (e.target.matches('input[name="price[]"], input[name="quantity[]"]')) {
-                calculateTotalsPreset();
-                calculateGrandTotalPreset();
-            }
-        });
-        
-        // Agregar nuevo producto personalizado
-        document.getElementById('add_custom_product').addEventListener('click', function() {
-            var container = document.getElementById('custom_products_container');
-            var group = container.querySelector('.product-custom-group');
-            var clone = group.cloneNode(true);
-            clone.querySelectorAll('input').forEach(function(input) {
-                input.value = "";
-            });
-            clone.querySelector('.total-field-custom').textContent = "0.00";
-            container.appendChild(clone);
-        });
-        
-        // Cargar productos predeterminados mediante AJAX al seleccionar un preset
-        document.getElementById('preset_theme').addEventListener('change', function() {
-            loadPresetProducts(this.value);
-        });
-        
+        /**
+         * Carga productos predeterminados para un tema específico
+         * @param {number} presetId - ID del preset seleccionado
+         */
         function loadPresetProducts(presetId) {
-            var container = document.getElementById('preset_products_container');
-            container.innerHTML = "";
-            if (!presetId) return;
+            if (!presetId) {
+                presetProductsContainer.innerHTML = "";
+                return;
+            }
             
             // Mostrar indicador de carga
-            container.innerHTML = '<div class="alert alert-info">Cargando productos...</div>';
+            presetProductsContainer.innerHTML = '<div class="alert alert-info">Cargando productos...</div>';
             
-            // Cambiar la ruta según la ubicación real de get_preset_products.php
-            fetch('admin/get_preset_products.php?preset_id=' + encodeURIComponent(presetId))
-                .then(response => response.json())
-                .then(data => {
-                    container.innerHTML = ""; // Limpiar contenedor
-                    
-                    if (data.success && data.products.length > 0) {
-                        data.products.forEach(function(prod, index) {
-                            var div = document.createElement('div');
-                            div.className = "product-group border p-3 mb-3 rounded";
-                            div.innerHTML = `
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <label class="form-label">Producto:</label>
-                                        <input type="hidden" name="product_id[]" value="${prod.id}">
-                                        <input type="text" class="form-control" value="${prod.name}" readonly>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Precio:</label>
-                                        <input type="number" name="price[]" class="form-control" step="0.01" min="0" required>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Cantidad:</label>
-                                        <input type="number" name="quantity[]" class="form-control" min="0" required>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label">Total:</label>
-                                        <div class="form-control bg-light total-field">0.00</div>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-danger mt-2 remove-product">Eliminar</button>
-                            `;
-                            container.appendChild(div);
-                        });
-                    } else {
-                        container.innerHTML = "<div class='alert alert-warning'>No se encontraron productos para este temario.</div>";
+            // Realizar solicitud AJAX para obtener productos
+            fetch('get_preset_products.php?preset_id=' + encodeURIComponent(presetId))
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor: ' + response.status);
                     }
-                    calculateGrandTotalPreset();
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Datos recibidos:", data);
+                    presetProductsContainer.innerHTML = ""; // Limpiar contenedor
+                    
+                    if (data.success && data.products && data.products.length > 0) {
+                        data.products.forEach(function(prod) {
+                            const productElement = createPresetProductElement(prod);
+                            presetProductsContainer.appendChild(productElement);
+                        });
+                        calculateTotalsPreset();
+                        calculateGrandTotal();
+                    } else {
+                        presetProductsContainer.innerHTML = "<div class='alert alert-warning'>No se encontraron productos para este temario.</div>";
+                    }
                 })
                 .catch(error => {
                     console.error("Error al cargar productos:", error);
-                    container.innerHTML = "<div class='alert alert-danger'>Error al cargar los productos predeterminados.</div>";
+                    presetProductsContainer.innerHTML = 
+                        "<div class='alert alert-danger'>Error al cargar los productos predeterminados. " + 
+                        "Detalles: " + error.message + "</div>";
                 });
         }
         
-        // Eliminar producto personalizado
-        document.getElementById('custom_products_container').addEventListener('click', function(e) {
-            if (e.target && e.target.matches('.remove-custom-product')) {
-                var groups = document.querySelectorAll('.product-custom-group');
-                if (groups.length > 1) {
-                    e.target.closest('.product-custom-group').remove();
-                    calculateGrandTotalCustom();
-                } else {
-                    alert("Debe haber al menos un producto.");
-                }
-            }
-        });
+        /**
+         * Crea un elemento DOM para un producto predeterminado
+         * @param {Object} product - Datos del producto
+         * @returns {HTMLElement} Elemento DOM del producto
+         */
+        function createPresetProductElement(product) {
+            const div = document.createElement('div');
+            div.className = "product-group border p-3 mb-3 rounded";
+            div.innerHTML = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Producto:</label>
+                        <input type="hidden" name="product_id[]" value="${product.id}">
+                        <input type="text" class="form-control" value="${product.name}" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Precio:</label>
+                        <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="${product.price || 0}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Cantidad:</label>
+                        <input type="number" name="quantity[]" class="form-control" min="0" value="${product.stock || 1}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Total:</label>
+                        <div class="form-control bg-light total-field">0.00</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger mt-2 remove-product">Eliminar</button>
+            `;
+            return div;
+        }
         
-        // Eliminar producto predeterminado
-        document.getElementById('preset_products_container').addEventListener('click', function(e) {
-            if (e.target && e.target.matches('.remove-product')) {
-                var groups = document.querySelectorAll('.product-group');
-                if (groups.length > 1) {
-                    e.target.closest('.product-group').remove();
-                    calculateGrandTotalPreset();
-                } else {
-                    alert("Debe haber al menos un producto.");
-                }
-            }
-        });
+        /**
+         * Agrega un producto adicional a la lista predeterminada
+         */
+        function addPresetProduct() {
+            const customProductCount = document.querySelectorAll('.product-group[data-custom="true"]').length;
+            const div = document.createElement('div');
+            div.className = "product-group border p-3 mb-3 rounded";
+            div.setAttribute('data-custom', 'true');
+            div.innerHTML = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Producto:</label>
+                        <input type="hidden" name="product_id[]" value="custom">
+                        <input type="text" name="product_name_custom[${customProductCount}]" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Precio:</label>
+                        <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="0" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Cantidad:</label>
+                        <input type="number" name="quantity[]" class="form-control" min="0" value="1" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Total:</label>
+                        <div class="form-control bg-light total-field">0.00</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger mt-2 remove-product">Eliminar</button>
+            `;
+            
+            presetProductsContainer.appendChild(div);
+            calculateTotalsPreset();
+            calculateGrandTotal();
+        }
         
-        // Form validation using Bootstrap
-        (function () {
-            'use strict'
+        /**
+         * Agrega un nuevo producto personalizado
+         */
+        function addCustomProduct() {
+            console.log("Agregando nuevo producto personalizado");
+            const firstGroup = customProductsContainer.querySelector('.product-custom-group');
+            if (!firstGroup) return;
             
-            var forms = document.querySelectorAll('.needs-validation')
+            const newGroup = firstGroup.cloneNode(true);
             
-            Array.prototype.slice.call(forms)
-                .forEach(function (form) {
-                    form.addEventListener('submit', function (event) {
-                        if (!form.checkValidity()) {
-                            event.preventDefault()
-                            event.stopPropagation()
-                        }
-                        
-                        form.classList.add('was-validated')
-                    }, false)
-                })
-        })()
+            // Limpiar valores
+            newGroup.querySelectorAll('input').forEach(function(input) {
+                input.value = "";
+            });
+            
+            // Reiniciar total
+            newGroup.querySelector('.total-field-custom').textContent = "0.00";
+            
+            // Añadir al contenedor
+            customProductsContainer.appendChild(newGroup);
+        }
+        
+        /**
+         * Elimina un producto personalizado
+         * @param {Event} e - Evento de clic
+         */
+        function removeCustomProduct(e) {
+            const groups = document.querySelectorAll('.product-custom-group');
+            if (groups.length > 1) {
+                e.target.closest('.product-custom-group').remove();
+                calculateTotalsCustom();
+                calculateGrandTotal();
+            } else {
+                alert("Debe haber al menos un producto.");
+            }
+        }
+        
+        /**
+         * Elimina un producto predeterminado
+         * @param {Event} e - Evento de clic
+         */
+        function removePresetProduct(e) {
+            const groups = document.querySelectorAll('.product-group');
+            if (groups.length > 1) {
+                e.target.closest('.product-group').remove();
+                calculateTotalsPreset();
+                calculateGrandTotal();
+            } else {
+                alert("Debe haber al menos un producto.");
+            }
+        }
+        
+        /**
+         * Calcula totales para productos personalizados
+         */
+        function calculateTotalsCustom() {
+            document.querySelectorAll('.product-custom-group').forEach(function(group) {
+                const priceInput = group.querySelector('input[name="price_custom[]"]');
+                const quantityInput = group.querySelector('input[name="quantity_custom[]"]');
+                const totalField = group.querySelector('.total-field-custom');
+                
+                if (priceInput && quantityInput && totalField) {
+                    const price = parseFloat(priceInput.value) || 0;
+                    const quantity = parseFloat(quantityInput.value) || 0;
+                    const total = price * quantity;
+                    totalField.textContent = total.toFixed(2);
+                }
+            });
+        }
+        
+        /**
+         * Calcula totales para productos predeterminados
+         */
+        function calculateTotalsPreset() {
+            document.querySelectorAll('.product-group').forEach(function(group) {
+                const priceInput = group.querySelector('input[name="price[]"]');
+                const quantityInput = group.querySelector('input[name="quantity[]"]');
+                const totalField = group.querySelector('.total-field');
+                
+                if (priceInput && quantityInput && totalField) {
+                    const price = parseFloat(priceInput.value) || 0;
+                    const quantity = parseFloat(quantityInput.value) || 0;
+                    const total = price * quantity;
+                    totalField.textContent = total.toFixed(2);
+                }
+            });
+        }
+        
+        /**
+         * Calcula el total general según el tipo de lista activa
+         */
+        function calculateGrandTotal() {
+            let grandTotal = 0;
+            const listType = listTypeSelect.value;
+            
+            if (listType === 'predeterminada') {
+                document.querySelectorAll('.product-group .total-field').forEach(function(field) {
+                    grandTotal += parseFloat(field.textContent) || 0;
+                });
+            } else {
+                document.querySelectorAll('.product-custom-group .total-field-custom').forEach(function(field) {
+                    grandTotal += parseFloat(field.textContent) || 0;
+                });
+            }
+            
+            if (grandTotalElement) {
+                grandTotalElement.textContent = grandTotal.toFixed(2);
+            }
+        }
+    });
     </script>
 </body>
 </html>

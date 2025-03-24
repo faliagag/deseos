@@ -1,5 +1,5 @@
 <?php
-// Funciones de utilidad general
+// includes/helpers.php
 
 // Sanitizar datos de entrada
 function sanitize($input) {
@@ -9,6 +9,17 @@ function sanitize($input) {
         }
         return $input;
     }
+    
+    // Verificar si el input es null o no es string
+    if ($input === null) {
+        return '';
+    }
+    
+    // Convertir a string si es necesario
+    if (!is_string($input)) {
+        $input = (string)$input;
+    }
+    
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
