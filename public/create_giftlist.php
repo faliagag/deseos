@@ -1,5 +1,5 @@
 <?php
-// public/create_giftlist.php
+// public/create_giftlist.php - Versión actualizada
 
 // Activar reporte de errores para depuración
 ini_set('display_errors', 1);
@@ -22,6 +22,10 @@ $auth = new Auth($pdo);
 $auth->require('login.php');
 
 $user = $auth->user();
+
+// Instanciar controlador para obtener las categorías de regalos
+$glc = new GiftListController($pdo);
+$categories = $glc->getAllCategories();
 
 // Consultar los presets (temarios) creados por el administrador
 try {
@@ -48,8 +52,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // Recopilar datos generales de la lista
         $data = [
             'title'         => trim($_POST['title'] ?? ''),
-            'description'   => trim($_POST['description'] ?? '')
-            // Nota: Removidos los campos que no existen en la estructura actual de la BD
+            'description'   => trim($_POST['description'] ?? ''),
+            'event_type'    => trim($_POST['event_type'] ?? ''),
+            'beneficiary1'  => trim($_POST['beneficiary1'] ?? ''),
+            'beneficiary2'  => trim($_POST['beneficiary2'] ?? ''),
+            'preset_theme'  => !empty($_POST['preset_theme']) ? intval($_POST['preset_theme']) : null,
+            // Nuevos campos
+            'expiry_date'   => trim($_POST['expiry_date'] ?? ''),
+            'visibility'    => trim($_POST['visibility'] ?? 'link_only')
         ];
         
         // Validaciones básicas
@@ -57,6 +67,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $error = "El título de la lista es obligatorio.";
         } elseif (empty($data['description'])) {
             $error = "La descripción de la lista es obligatoria.";
+        } elseif (!in_array($data['visibility'], ['public', 'private', 'link_only'])) {
+            $error = "La visibilidad seleccionada no es válida.";
         } else {
             $list_type = $_POST['list_type'] ?? 'predeterminada';
             
@@ -80,6 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty($presetProductId)) {
                                         $price = floatval($_POST['price'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity'][$index] ?? 0);
+                                        $category_id = intval($_POST['category_id'][$index] ?? null);
                                         
                                         // Si es un producto personalizado en lista predeterminada
                                         if ($presetProductId === 'custom') {
@@ -117,19 +130,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                             error_log("Procesando producto predeterminado: $name");
                                         }
                                         
-                                        // Insertar el producto en la lista
+                                        // Insertar el producto en la lista con categoría
                                         $result = $glc->addGift($gift_list_id, [
                                             "name"        => $name,
                                             "description" => $description,
                                             "price"       => $price,
-                                            "stock"       => $quantity
+                                            "stock"       => $quantity,
+                                            "category_id" => $category_id
                                         ]);
                                         
                                         if ($result) {
                                             $productsAdded++;
-                                            error_log("Producto añadido: $name, precio: $price, cantidad: $quantity");
+                                            error_log("Producto añadido: $name, precio: $price, cantidad: $quantity, categoría: $category_id");
                                         } else {
-                                            error_log("Error al añadir regalo: $name, precio: $price, cantidad: $quantity");
+                                            error_log("Error al añadir regalo: $name, precio: $price, cantidad: $quantity, categoría: $category_id");
                                         }
                                     }
                                 }
@@ -140,19 +154,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty(trim($prod_name))) {
                                         $price = floatval($_POST['price_custom'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity_custom'][$index] ?? 0);
+                                        $category_id = intval($_POST['category_id_custom'][$index] ?? null);
                                         
                                         $result = $glc->addGift($gift_list_id, [
                                             "name"        => trim($prod_name),
                                             "description" => "",
                                             "price"       => $price,
-                                            "stock"       => $quantity
+                                            "stock"       => $quantity,
+                                            "category_id" => $category_id
                                         ]);
                                         
                                         if ($result) {
                                             $productsAdded++;
-                                            error_log("Producto personalizado añadido: $prod_name, precio: $price, cantidad: $quantity");
+                                            error_log("Producto personalizado añadido: $prod_name, precio: $price, cantidad: $quantity, categoría: $category_id");
                                         } else {
-                                            error_log("Error al añadir regalo personalizado: $prod_name, precio: $price, cantidad: $quantity");
+                                            error_log("Error al añadir regalo personalizado: $prod_name, precio: $price, cantidad: $quantity, categoría: $category_id");
                                         }
                                     }
                                 }
@@ -190,6 +206,7 @@ $title = "Crear Lista de Regalos";
     <title><?php echo $title; ?> - GiftList App</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .product-group, .product-custom-group {
@@ -200,6 +217,11 @@ $title = "Crear Lista de Regalos";
             background-color: #f9f9f9;
         }
         .d-none { display: none; }
+        .visibility-info {
+            font-size: 0.9rem;
+            display: none;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -258,6 +280,74 @@ $title = "Crear Lista de Regalos";
                         <textarea id="description" name="description" class="form-control" rows="3" required></textarea>
                         <div class="invalid-feedback">La descripción es obligatoria</div>
                     </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="event_type" class="form-label">Tipo de Evento:</label>
+                                <select id="event_type" name="event_type" class="form-select">
+                                    <option value="">Seleccione un tipo de evento</option>
+                                    <option value="Cumpleaños">Cumpleaños</option>
+                                    <option value="Matrimonio">Matrimonio</option>
+                                    <option value="Baby Shower">Baby Shower</option>
+                                    <option value="Aniversario">Aniversario</option>
+                                    <option value="Graduación">Graduación</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Sección para beneficiarios con lógica para matrimonio -->
+                            <div id="beneficiarySingle" class="mb-3">
+                                <label for="beneficiary1" class="form-label">Beneficiario:</label>
+                                <input type="text" id="beneficiary1" name="beneficiary1" class="form-control">
+                            </div>
+                            
+                            <div id="beneficiaryDouble" class="mb-3 d-none">
+                                <label class="form-label">Beneficiarios (novios):</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <input type="text" name="beneficiary1" class="form-control mb-2" placeholder="Primer beneficiario">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="text" name="beneficiary2" class="form-control" placeholder="Segundo beneficiario">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Nuevos campos para fecha límite y visibilidad -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="expiry_date" class="form-label">Fecha Límite (opcional):</label>
+                                <input type="date" id="expiry_date" name="expiry_date" class="form-control">
+                                <small class="form-text text-muted">Deja en blanco si no deseas fecha límite.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="visibility" class="form-label">Visibilidad de la Lista:</label>
+                                <select id="visibility" name="visibility" class="form-select" required>
+                                    <option value="link_only" selected>Solo con enlace</option>
+                                    <option value="public">Pública</option>
+                                    <option value="private">Privada</option>
+                                </select>
+                                
+                                <!-- Información de visibilidad -->
+                                <div id="link_only_info" class="visibility-info text-info">
+                                    <i class="bi bi-info-circle"></i> Solo personas con el enlace podrán ver esta lista.
+                                </div>
+                                <div id="public_info" class="visibility-info text-success">
+                                    <i class="bi bi-globe"></i> Esta lista será visible públicamente y aparecerá en búsquedas.
+                                </div>
+                                <div id="private_info" class="visibility-info text-warning">
+                                    <i class="bi bi-lock"></i> Solo tú podrás ver esta lista. Tendrás que compartir el enlace manualmente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -302,17 +392,26 @@ $title = "Crear Lista de Regalos";
                         <div id="custom_products_container">
                             <div class="product-custom-group">
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="form-label">Nombre del Producto:</label>
                                         <input type="text" name="product_name[]" class="form-control" required>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <label class="form-label">Precio:</label>
                                         <input type="number" name="price_custom[]" class="form-control price-input" step="0.01" min="0" required>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <label class="form-label">Cantidad:</label>
                                         <input type="number" name="quantity_custom[]" class="form-control quantity-input" min="0" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Categoría:</label>
+                                        <select name="category_id_custom[]" class="form-select">
+                                            <option value="">Sin categoría</option>
+                                            <?php foreach ($categories as $category): ?>
+                                                <option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label">Total:</label>
@@ -374,6 +473,25 @@ $title = "Crear Lista de Regalos";
         const addCustomProductBtn = document.getElementById('add_custom_product');
         const addPresetProductBtn = document.getElementById('add_preset_product');
         const grandTotalElement = document.getElementById('grand_total');
+        const visibilitySelect = document.getElementById('visibility');
+        const eventTypeSelect = document.getElementById('event_type');
+        const beneficiarySingle = document.getElementById('beneficiarySingle');
+        const beneficiaryDouble = document.getElementById('beneficiaryDouble');
+        
+        // Mostrar información de visibilidad
+        function updateVisibilityInfo() {
+            // Ocultar todos los mensajes de info
+            document.querySelectorAll('.visibility-info').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            // Mostrar solo el mensaje correspondiente a la selección actual
+            const selectedVisibility = visibilitySelect.value;
+            document.getElementById(selectedVisibility + '_info').style.display = 'block';
+        }
+        
+        // Agregar event listener para el cambio de visibilidad
+        visibilitySelect.addEventListener('change', updateVisibilityInfo);
         
         // Inicialización
         initApp();
@@ -386,6 +504,29 @@ $title = "Crear Lista de Regalos";
             
             // Event listeners para cambios de tipo de lista
             listTypeSelect.addEventListener('change', handleListTypeChange);
+            
+            // Event listener para cambios de tipo de evento (para beneficiarios)
+            if (eventTypeSelect) {
+                eventTypeSelect.addEventListener('change', function() {
+                    handleEventTypeChange();
+                });
+            }
+            
+            // Función para manejar el cambio de tipo de evento
+            function handleEventTypeChange() {
+                const eventType = eventTypeSelect.value;
+                
+                if (eventType === "Matrimonio") {
+                    beneficiarySingle.classList.add('d-none');
+                    beneficiaryDouble.classList.remove('d-none');
+                } else {
+                    beneficiarySingle.classList.remove('d-none');
+                    beneficiaryDouble.classList.add('d-none');
+                }
+            }
+            
+            // Inicializar el estado de los beneficiarios
+            handleEventTypeChange();
             
             // Event listener para selección de tema predeterminado
             if (presetThemeSelect) {
@@ -436,6 +577,9 @@ $title = "Crear Lista de Regalos";
             
             // Inicializar el estado actual
             handleListTypeChange();
+            
+            // Mostrar la información de visibilidad predeterminada
+            updateVisibilityInfo();
         }
         
         /**
@@ -508,20 +652,33 @@ $title = "Crear Lista de Regalos";
         function createPresetProductElement(product) {
             const div = document.createElement('div');
             div.className = "product-group border p-3 mb-3 rounded";
+            
+            // Obtener las opciones de categoría
+            let categoryOptions = '<option value="">Sin categoría</option>';
+            <?php foreach ($categories as $category): ?>
+                categoryOptions += `<option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>`;
+            <?php endforeach; ?>
+            
             div.innerHTML = `
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Producto:</label>
                         <input type="hidden" name="product_id[]" value="${product.id}">
                         <input type="text" class="form-control" value="${product.name}" readonly>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Precio:</label>
                         <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="${product.price || 0}" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Cantidad:</label>
                         <input type="number" name="quantity[]" class="form-control" min="0" value="${product.stock || 1}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Categoría:</label>
+                        <select name="category_id[]" class="form-select">
+                            ${categoryOptions}
+                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Total:</label>
@@ -541,20 +698,33 @@ $title = "Crear Lista de Regalos";
             const div = document.createElement('div');
             div.className = "product-group border p-3 mb-3 rounded";
             div.setAttribute('data-custom', 'true');
+            
+            // Obtener las opciones de categoría
+            let categoryOptions = '<option value="">Sin categoría</option>';
+            <?php foreach ($categories as $category): ?>
+                categoryOptions += `<option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>`;
+            <?php endforeach; ?>
+            
             div.innerHTML = `
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Producto:</label>
                         <input type="hidden" name="product_id[]" value="custom">
                         <input type="text" name="product_name_custom[${customProductCount}]" class="form-control" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Precio:</label>
                         <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="0" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Cantidad:</label>
                         <input type="number" name="quantity[]" class="form-control" min="0" value="1" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Categoría:</label>
+                        <select name="category_id[]" class="form-select">
+                            ${categoryOptions}
+                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Total:</label>
@@ -583,6 +753,12 @@ $title = "Crear Lista de Regalos";
             newGroup.querySelectorAll('input').forEach(function(input) {
                 input.value = "";
             });
+            
+            // Resetear selección de categoría
+            const categorySelect = newGroup.querySelector('select');
+            if (categorySelect) {
+                categorySelect.selectedIndex = 0;
+            }
             
             // Reiniciar total
             newGroup.querySelector('.total-field-custom').textContent = "0.00";

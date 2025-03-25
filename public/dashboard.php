@@ -27,6 +27,11 @@ $myLists = $glc->getByUser($user['id']);
 // Obtener historial de transacciones
 $transactions = $paymentController->getUserTransactionHistory($user['id']);
 
+// Corregir la inicialización para evitar NULL
+if (!is_array($transactions)) {
+    $transactions = []; // Asegurarse de que transactions sea siempre un array
+}
+
 // Obtener mensaje flash
 $flash = get_flash_message();
 
@@ -91,7 +96,7 @@ $config = require_once __DIR__ . '/../config/config.php';
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="dashboard-stat blue">
-                    <h3><?php echo count($myLists); ?></h3>
+                    <h3><?php echo is_array($myLists) ? count($myLists) : 0; ?></h3>
                     <p>Listas Creadas</p>
                 </div>
             </div>
@@ -143,7 +148,7 @@ $config = require_once __DIR__ . '/../config/config.php';
                     </a>
                 </div>
                 
-                <?php if (!empty($myLists)): ?>
+                <?php if (is_array($myLists) && !empty($myLists)): ?>
                     <div class="row">
                         <?php foreach ($myLists as $list): ?>
                             <div class="col-md-6 mb-3">

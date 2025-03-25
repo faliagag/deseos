@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Total:</label>
-                    <div class="form-control bg-light total-field">0</div>
+                    <div class="form-control bg-light total-field">$0</div>
                 </div>
             </div>
             <button type="button" class="btn btn-sm btn-danger mt-2 remove-product">Eliminar</button>
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Reiniciar total
-        newGroup.querySelector('.total-field-custom').textContent = "0";
+        newGroup.querySelector('.total-field-custom').textContent = "$0";
         
         // Añadir al contenedor
         customProductsContainer.appendChild(newGroup);
@@ -250,10 +250,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalField = group.querySelector('.total-field-custom');
             
             if (priceInput && quantityInput && totalField) {
-                const price = Math.round(parseFloat(priceInput.value) || 0);
-                const quantity = parseInt(quantityInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                const quantity = parseFloat(quantityInput.value) || 0;
                 const total = price * quantity;
-                totalField.textContent = total.toString();
+                totalField.textContent = formatMoneyCLP(total);
             }
         });
     }
@@ -267,46 +267,4 @@ document.addEventListener('DOMContentLoaded', function() {
             const quantityInput = group.querySelector('input[name="quantity[]"]');
             const totalField = group.querySelector('.total-field');
             
-            if (priceInput && quantityInput && totalField) {
-                const price = Math.round(parseFloat(priceInput.value) || 0);
-                const quantity = parseInt(quantityInput.value) || 0;
-                const total = price * quantity;
-                totalField.textContent = total.toString();
-            }
-        });
-    }
-    
-    /**
-     * Calcula el total general según el tipo de lista activa
-     */
-    function calculateGrandTotal() {
-        let grandTotal = 0;
-        const listType = listTypeSelect.value;
-        
-        if (listType === 'predeterminada') {
-            document.querySelectorAll('.product-group .total-field').forEach(function(field) {
-                grandTotal += parseInt(field.textContent) || 0;
-            });
-        } else {
-            document.querySelectorAll('.product-custom-group .total-field-custom').forEach(function(field) {
-                grandTotal += parseInt(field.textContent) || 0;
-            });
-        }
-        
-        if (grandTotalElement) {
-            grandTotalElement.textContent = grandTotal.toString();
-        }
-    }
-    
-    /**
-     * Función para formatear montos en pesos chilenos (sin decimales)
-     * @param {number} amount - Monto a formatear
-     * @returns {string} Monto formateado
-     */
-    function formatMoneyCLP(amount) {
-        return '$' + new Intl.NumberFormat('es-CL', {
-            maximumFractionDigits: 0,
-            minimumFractionDigits: 0
-        }).format(Math.round(amount));
-    }
-});
+            if (priceInput && quantityInput &&
