@@ -1,3 +1,5 @@
+// assets/js/script.js
+
 // Common functions
 document.addEventListener("DOMContentLoaded", function(){
     console.log("GiftList App initialized");
@@ -59,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function(){
             const totalElement = document.querySelector(`#total-${i+1}`);
             
             if (totalElement) {
-                totalElement.textContent = (price * quantity).toFixed(2);
+                totalElement.textContent = formatMoneyCLP(price * quantity);
             }
         }
         
@@ -68,9 +70,11 @@ document.addEventListener("DOMContentLoaded", function(){
         if (grandTotalElement) {
             let grandTotal = 0;
             document.querySelectorAll('[id^="total-"]').forEach(el => {
-                grandTotal += parseFloat(el.textContent) || 0;
+                // Extraer el número del texto (quitar $ y puntos)
+                const value = el.textContent.replace(/[$\.]/g, '');
+                grandTotal += parseInt(value) || 0;
             });
-            grandTotalElement.textContent = grandTotal.toFixed(2);
+            grandTotalElement.textContent = formatMoneyCLP(grandTotal);
         }
     };
     
@@ -89,3 +93,11 @@ document.addEventListener("DOMContentLoaded", function(){
     // Initial calculation
     calculateTotals();
 });
+
+// Función para formatear montos en pesos chilenos (sin decimales)
+function formatMoneyCLP(amount) {
+    return '$' + new Intl.NumberFormat('es-CL', {
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0
+    }).format(Math.round(amount));
+}

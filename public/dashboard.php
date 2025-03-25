@@ -41,6 +41,7 @@ $config = require_once __DIR__ . '/../config/config.php';
     <title>Dashboard - GiftList App</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -110,7 +111,7 @@ $config = require_once __DIR__ . '/../config/config.php';
                                     $totalAmount += $tx['amount'];
                                 }
                             }
-                            echo format_money($totalAmount);
+                            echo format_money($totalAmount, 'CLP');
                         ?>
                     </h3>
                     <p>Total Recaudado</p>
@@ -213,7 +214,7 @@ $config = require_once __DIR__ . '/../config/config.php';
                                         <td><?php echo format_date($tx['created_at']); ?></td>
                                         <td><?php echo htmlspecialchars($tx['list_title']); ?></td>
                                         <td><?php echo $tx['gift_name'] ? htmlspecialchars($tx['gift_name']) : 'N/A'; ?></td>
-                                        <td><?php echo format_money($tx['amount'], $tx['currency']); ?></td>
+                                        <td><?php echo format_money($tx['amount'], 'CLP'); ?></td>
                                         <td>
                                             <?php 
                                                 $statusClass = 'secondary';
