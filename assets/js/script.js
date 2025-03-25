@@ -56,8 +56,8 @@ document.addEventListener("DOMContentLoaded", function(){
         const quantityInputs = document.querySelectorAll('.quantity-input');
         
         for (let i = 0; i < priceInputs.length; i++) {
-            const price = parseFloat(priceInputs[i].value) || 0;
-            const quantity = parseFloat(quantityInputs[i].value) || 0;
+            const price = Math.round(parseFloat(priceInputs[i].value) || 0);
+            const quantity = parseInt(quantityInputs[i].value) || 0;
             const totalElement = document.querySelector(`#total-${i+1}`);
             
             if (totalElement) {

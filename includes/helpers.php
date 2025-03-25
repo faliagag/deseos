@@ -36,11 +36,11 @@ function verify_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
-// Función para formatear dinero (modificada para pesos chilenos sin decimales)
+// Función para formatear dinero (actualizada para pesos chilenos sin decimales)
 function format_money($amount, $currency = 'CLP') {
     if (strtoupper($currency) === 'CLP') {
         // Pesos chilenos: sin decimales, con punto como separador de miles
-        return '$' . number_format($amount, 0, ',', '.');
+        return '$' . number_format(round($amount), 0, ',', '.');
     } elseif (strtoupper($currency) === 'USD') {
         // Dólares: con 2 decimales, formato internacional
         return 'US$' . number_format($amount, 2, '.', ',');

@@ -180,16 +180,16 @@ foreach ($_SESSION['cart'] as $item) {
                                 <?php foreach ($_SESSION['cart'] as $item): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($item['name']); ?></td>
-                                        <td>$<?php echo number_format($item['price'], 2); ?></td>
+                                        <td><?php echo format_money($item['price'], 'CLP'); ?></td>
                                         <td><?php echo $item['quantity']; ?></td>
-                                        <td class="text-end">$<?php echo number_format($item['price'] * $item['quantity'], 2); ?></td>
+                                        <td class="text-end"><?php echo format_money($item['price'] * $item['quantity'], 'CLP'); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot class="table-light">
                                 <tr>
                                     <th colspan="3" class="text-end">Total:</th>
-                                    <th class="text-end">$<?php echo number_format($cartTotal, 2); ?></th>
+                                    <th class="text-end"><?php echo format_money($cartTotal, 'CLP'); ?></th>
                                 </tr>
                             </tfoot>
                         </table>
@@ -258,7 +258,7 @@ foreach ($_SESSION['cart'] as $item) {
                             <i class="bi bi-arrow-left"></i> Volver
                         </a>
                         <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-credit-card"></i> Pagar $<?php echo number_format($cartTotal, 2); ?>
+                            <i class="bi bi-credit-card"></i> Pagar <?php echo format_money($cartTotal, 'CLP'); ?>
                         </button>
                     </div>
                 </form>

@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Precio:</label>
-                    <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="0" required>
+                    <input type="number" name="price[]" class="form-control" step="1" min="0" value="0" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Cantidad:</label>
@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Total:</label>
-                    <div class="form-control bg-light total-field">0.00</div>
+                    <div class="form-control bg-light total-field">0</div>
                 </div>
             </div>
             <button type="button" class="btn btn-sm btn-danger mt-2 remove-product">Eliminar</button>
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Reiniciar total
-        newGroup.querySelector('.total-field-custom').textContent = "0.00";
+        newGroup.querySelector('.total-field-custom').textContent = "0";
         
         // Añadir al contenedor
         customProductsContainer.appendChild(newGroup);
@@ -250,10 +250,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalField = group.querySelector('.total-field-custom');
             
             if (priceInput && quantityInput && totalField) {
-                const price = parseFloat(priceInput.value) || 0;
-                const quantity = parseFloat(quantityInput.value) || 0;
+                const price = Math.round(parseFloat(priceInput.value) || 0);
+                const quantity = parseInt(quantityInput.value) || 0;
                 const total = price * quantity;
-                totalField.textContent = total.toFixed(2);
+                totalField.textContent = total.toString();
             }
         });
     }
@@ -268,10 +268,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalField = group.querySelector('.total-field');
             
             if (priceInput && quantityInput && totalField) {
-                const price = parseFloat(priceInput.value) || 0;
-                const quantity = parseFloat(quantityInput.value) || 0;
+                const price = Math.round(parseFloat(priceInput.value) || 0);
+                const quantity = parseInt(quantityInput.value) || 0;
                 const total = price * quantity;
-                totalField.textContent = total.toFixed(2);
+                totalField.textContent = total.toString();
             }
         });
     }
@@ -285,16 +285,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (listType === 'predeterminada') {
             document.querySelectorAll('.product-group .total-field').forEach(function(field) {
-                grandTotal += parseFloat(field.textContent) || 0;
+                grandTotal += parseInt(field.textContent) || 0;
             });
         } else {
             document.querySelectorAll('.product-custom-group .total-field-custom').forEach(function(field) {
-                grandTotal += parseFloat(field.textContent) || 0;
+                grandTotal += parseInt(field.textContent) || 0;
             });
         }
         
         if (grandTotalElement) {
-            grandTotalElement.textContent = grandTotal.toFixed(2);
+            grandTotalElement.textContent = grandTotal.toString();
         }
+    }
+    
+    /**
+     * Función para formatear montos en pesos chilenos (sin decimales)
+     * @param {number} amount - Monto a formatear
+     * @returns {string} Monto formateado
+     */
+    function formatMoneyCLP(amount) {
+        return '$' + new Intl.NumberFormat('es-CL', {
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0
+        }).format(Math.round(amount));
     }
 });
