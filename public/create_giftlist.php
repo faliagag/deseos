@@ -307,10 +307,10 @@ $title = "Crear Lista de Regalos";
                                 <label class="form-label">Beneficiarios (novios):</label>
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <input type="text" name="beneficiary1" class="form-control mb-2" placeholder="Primer beneficiario">
+                                        <input type="text" name="beneficiary1" class="form-control mb-2" placeholder="Primer beneficiario" disabled>
                                     </div>
                                     <div class="col-md-6">
-                                        <input type="text" name="beneficiary2" class="form-control" placeholder="Segundo beneficiario">
+                                        <input type="text" name="beneficiary2" class="form-control" placeholder="Segundo beneficiario" disabled>
                                     </div>
                                 </div>
                             </div>
@@ -516,12 +516,41 @@ $title = "Crear Lista de Regalos";
             function handleEventTypeChange() {
                 const eventType = eventTypeSelect.value;
                 
+                // Obtener referencias a ambos inputs de beneficiario1
+                const singleBeneficiary = document.querySelector('#beneficiarySingle input[name="beneficiary1"]');
+                const doubleBeneficiary1 = document.querySelector('#beneficiaryDouble input[name="beneficiary1"]');
+                const doubleBeneficiary2 = document.querySelector('#beneficiaryDouble input[name="beneficiary2"]');
+                
                 if (eventType === "Matrimonio") {
+                    // Transferir valor de single a double si es necesario
+                    if (!doubleBeneficiary1.value && singleBeneficiary.value) {
+                        doubleBeneficiary1.value = singleBeneficiary.value;
+                    }
+                    
+                    // Mostrar double, ocultar single
                     beneficiarySingle.classList.add('d-none');
                     beneficiaryDouble.classList.remove('d-none');
+                    
+                    // Deshabilitar input single para asegurar que no se envíe
+                    singleBeneficiary.disabled = true;
+                    // Habilitar inputs double
+                    doubleBeneficiary1.disabled = false;
+                    doubleBeneficiary2.disabled = false;
                 } else {
+                    // Transferir valor de double a single si es necesario
+                    if (!singleBeneficiary.value && doubleBeneficiary1.value) {
+                        singleBeneficiary.value = doubleBeneficiary1.value;
+                    }
+                    
+                    // Mostrar single, ocultar double
                     beneficiarySingle.classList.remove('d-none');
                     beneficiaryDouble.classList.add('d-none');
+                    
+                    // Habilitar input single
+                    singleBeneficiary.disabled = false;
+                    // Deshabilitar inputs double para asegurar que no se envíen
+                    doubleBeneficiary1.disabled = true;
+                    doubleBeneficiary2.disabled = true;
                 }
             }
             

@@ -1,5 +1,5 @@
 <?php
-// public/giftlist.php?link=xxxxx
+// public/giftlist.php
 
 // Activar reporte de errores para depuración
 ini_set('display_errors', 1);
@@ -12,7 +12,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../includes/db.php";
-require_once __DIR__ . "/../controllers/GiftListController.php";
 require_once __DIR__ . "/../includes/helpers.php";
 
 // Inicializar carrito si no existe
@@ -71,8 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
-    // Acción: Vaciar carrito
+    // Acción: Vaciar carrito - CORREGIDO
     if (isset($_POST['action']) && $_POST['action'] === 'clear_cart') {
+        // Vaciar completamente el carrito
         $_SESSION['cart'] = [];
         
         // Redirigir para evitar reenvío del formulario
@@ -82,9 +82,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Acción: Procesar pago
     if (isset($_POST['action']) && $_POST['action'] === 'checkout') {
-        // Aquí redirigir a la página de checkout que procesará el carrito
+        // Guardar mensaje de checkout si existe
         $_SESSION['checkout_message'] = $_POST['message'] ?? '';
-        header("Location: checkout.php");
+        
+        // Redirigir a la página de checkout
+        header("Location: checkout.php?from_list=" . urlencode($_GET["link"]));
         exit;
     }
 }
@@ -98,30 +100,35 @@ if (empty($unique_link)) {
     exit;
 }
 
-// Imprimir información de depuración
-error_log("Buscando lista con enlace: $unique_link");
-
-// Crear instancia del controlador
-$controller = new GiftListController($pdo);
-
-// Intentar obtener la lista
-$giftList = $controller->show($unique_link);
-
-// Verificar si se encontró la lista
-if (!$giftList) {
-    echo "<div class='container mt-5'><div class='alert alert-warning'>Lista de regalos no encontrada.</div></div>";
-    // Imprimir información de depuración
-    error_log("No se encontró la lista con enlace: $unique_link");
-    exit;
-}
-
-// Obtener información del creador de la lista
+// Consultar la lista directamente con PDO
 try {
+    // Intentar obtener la lista
+    $stmt = $pdo->prepare("SELECT * FROM gift_lists WHERE unique_link = ?");
+    $stmt->execute([$unique_link]);
+    $giftList = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Verificar si se encontró la lista
+    if (!$giftList) {
+        echo "<div class='container mt-5'><div class='alert alert-warning'>Lista de regalos no encontrada.</div></div>";
+        exit;
+    }
+    
+    // Obtener los regalos asociados a la lista
+    $stmtGifts = $pdo->prepare("SELECT * FROM gifts WHERE gift_list_id = ?");
+    $stmtGifts->execute([$giftList['id']]);
+    $giftList['gifts'] = $stmtGifts->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Obtener información del creador de la lista
     $stmt = $pdo->prepare("SELECT name, lastname FROM users WHERE id = ?");
     $stmt->execute([$giftList['user_id']]);
-    $creator = $stmt->fetch();
+    $creator = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$creator) {
+        $creator = ['name' => 'Usuario', 'lastname' => ''];
+    }
 } catch (Exception $e) {
-    $creator = ['name' => 'Usuario', 'lastname' => ''];
+    echo "<div class='container mt-5'><div class='alert alert-danger'>Error al consultar la base de datos: " . htmlspecialchars($e->getMessage()) . "</div></div>";
+    exit;
 }
 
 // Calcular totales del carrito
@@ -131,10 +138,6 @@ foreach ($_SESSION['cart'] as $item) {
     $cartTotal += $item['price'] * $item['quantity'];
     $cartItems += $item['quantity'];
 }
-
-// Imprimir información de depuración
-error_log("Lista encontrada: " . print_r($giftList, true));
-error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList["gifts"]) : "ninguno"));
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -145,7 +148,6 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/giftlist-styles.css">
     <style>
         .cart-badge {
             position: absolute;
@@ -163,22 +165,6 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
             transform: translateY(-5px);
         }
         
-        .btn-quantity {
-            width: 2.5rem;
-        }
-        
-        .quantity-input {
-            text-align: center;
-            border-left: 0;
-            border-right: 0;
-        }
-        
-        .input-quantity::-webkit-inner-spin-button, 
-        .input-quantity::-webkit-outer-spin-button { 
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        
         .wishlist-header {
             background-color: #f8f9fa;
             padding: 20px;
@@ -190,22 +176,6 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
         .creator-info {
             font-style: italic;
             color: #6c757d;
-        }
-        
-        /* Estilos para el control de cantidad */
-        input[type="number"]::-webkit-inner-spin-button, 
-        input[type="number"]::-webkit-outer-spin-button { 
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        
-        input[type="number"] {
-            -moz-appearance: textfield;
-        }
-        
-        .input-group>.form-control {
-            flex: 0 0 auto;
-            width: auto;
         }
         
         /* Fix para asegurar que los controles de cantidad se muestren correctamente */
@@ -303,7 +273,7 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
                                     <p class="card-text text-muted"><?php echo htmlspecialchars($gift["description"]); ?></p>
                                 <?php endif; ?>
                                 <p class="card-text fw-bold">
-                                    Precio: <?php echo format_money($gift["price"], 'CLP'); ?>
+                                    Precio: <?php echo (function_exists('format_money')) ? format_money($gift["price"], 'CLP') : '$'.number_format($gift["price"], 0, ',', '.'); ?>
                                 </p>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <?php if ($isAvailable): ?>
@@ -372,10 +342,10 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
                                 <small class="text-muted">
-                                    <?php echo format_money($item['price'], 'CLP'); ?> x <?php echo $item['quantity']; ?>
+                                    <?php echo (function_exists('format_money')) ? format_money($item['price'], 'CLP') : '$'.number_format($item['price'], 0, ',', '.'); ?> x <?php echo $item['quantity']; ?>
                                 </small>
                                 <span class="fw-bold">
-                                    <?php echo format_money($item['price'] * $item['quantity'], 'CLP'); ?>
+                                    <?php echo (function_exists('format_money')) ? format_money($item['price'] * $item['quantity'], 'CLP') : '$'.number_format($item['price'] * $item['quantity'], 0, ',', '.'); ?>
                                 </span>
                             </div>
                         </div>
@@ -386,32 +356,35 @@ error_log("Regalos encontrados: " . (isset($giftList["gifts"]) ? count($giftList
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="card-title mb-0">Total:</h5>
-                            <h5 class="mb-0"><?php echo format_money($cartTotal, 'CLP'); ?></h5>
+                            <h5 class="mb-0"><?php echo (function_exists('format_money')) ? format_money($cartTotal, 'CLP') : '$'.number_format($cartTotal, 0, ',', '.'); ?></h5>
                         </div>
                     </div>
                 </div>
                 
+                <!-- Formulario para proceder al pago -->
                 <form method="post" action="">
                     <div class="mb-3">
                         <label for="message" class="form-label">Mensaje para <?php echo htmlspecialchars($creator['name']); ?>:</label>
                         <textarea class="form-control" id="message" name="message" rows="3" placeholder="Escribe un mensaje especial para acompañar tu regalo..."></textarea>
                     </div>
                     
-                    <div class="d-grid gap-2">
+                    <div class="d-grid">
                         <input type="hidden" name="action" value="checkout">
                         <input type="hidden" name="currency" value="clp">
                         <button type="submit" class="btn btn-success">
                             <i class="bi bi-credit-card"></i> Proceder al pago
                         </button>
-                        
-                        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('clearCartForm').submit();">
-                            <i class="bi bi-trash"></i> Vaciar carrito
-                        </button>
                     </div>
                 </form>
                 
-                <form id="clearCartForm" method="post" action="" class="d-none">
+                <!-- Formulario separado para vaciar el carrito -->
+                <form method="post" action="">
                     <input type="hidden" name="action" value="clear_cart">
+                    <div class="d-grid mt-2">
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Vaciar carrito
+                        </button>
+                    </div>
                 </form>
             <?php endif; ?>
         </div>
