@@ -1,5 +1,5 @@
 <?php
-// public/dashboard.php
+// public/dashboard.php - Actualizado con notificaciones
 
 // Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
@@ -10,6 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../controllers/GiftListController.php';
 require_once __DIR__ . '/../controllers/PaymentController.php';
+require_once __DIR__ . '/../controllers/NotificationController.php'; // Nuevo controlador
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/Auth.php';
 
@@ -20,12 +21,17 @@ $auth->require('login.php');
 $user = $auth->user();
 $glc = new GiftListController($pdo);
 $paymentController = new PaymentController($pdo);
+$notificationController = new NotificationController($pdo); // Nuevo controlador
 
 // Obtener listas del usuario
 $myLists = $glc->getByUser($user['id']);
 
 // Obtener historial de transacciones
 $transactions = $paymentController->getUserTransactionHistory($user['id']);
+
+// Obtener notificaciones recientes (las 5 más recientes no leídas)
+$recentNotifications = $notificationController->getUserNotifications($user['id'], true, 5);
+$unreadCount = $notificationController->countUnreadNotifications($user['id']);
 
 // Corregir la inicialización para evitar NULL
 if (!is_array($transactions)) {
@@ -48,6 +54,58 @@ $config = require_once __DIR__ . '/../config/config.php';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* Estilos adicionales para notificaciones */
+        .notification-dropdown {
+            min-width: 320px;
+            padding: 0;
+        }
+        
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .notification-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+        }
+        
+        .notification-item:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+        
+        .notification-item.unread {
+            background-color: rgba(13, 110, 253, 0.05);
+            border-left: 3px solid #0d6efd;
+        }
+        
+        .notification-title {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .notification-time {
+            color: #6c757d;
+            font-size: 0.75rem;
+        }
+        
+        .notification-footer {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 5px;
+            right: 2px;
+            font-size: 0.7rem;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -66,6 +124,97 @@ $config = require_once __DIR__ . '/../config/config.php';
                     </li>
                 </ul>
                 <ul class="navbar-nav">
+                    <!-- Menú de notificaciones -->
+                    <li class="nav-item dropdown me-2">
+                        <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell-fill fs-5"></i>
+                            <?php if ($unreadCount > 0): ?>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
+                                    <?php echo $unreadCount > 99 ? '99+' : $unreadCount; ?>
+                                </span>
+                            <?php endif; ?>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationsDropdown">
+                            <div class="notification-header">
+                                <span class="fw-bold">Notificaciones</span>
+                                <?php if ($unreadCount > 0): ?>
+                                    <span class="badge bg-primary"><?php echo $unreadCount; ?> nuevas</span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <?php if (empty($recentNotifications)): ?>
+                                <div class="notification-item text-center text-muted py-3">
+                                    <i class="bi bi-bell-slash"></i> No tienes notificaciones nuevas
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($recentNotifications as $notification): ?>
+                                    <?php
+                                    // Formatear la fecha
+                                    $date = new DateTime($notification['created_at']);
+                                    $now = new DateTime();
+                                    $diff = $now->diff($date);
+                                    
+                                    if ($diff->days == 0) {
+                                        if ($diff->h == 0) {
+                                            if ($diff->i == 0) {
+                                                $time = "hace unos segundos";
+                                            } else {
+                                                $time = "hace " . $diff->i . " min";
+                                            }
+                                        } else {
+                                            $time = "hace " . $diff->h . " h";
+                                        }
+                                    } elseif ($diff->days == 1) {
+                                        $time = "ayer";
+                                    } else {
+                                        $time = $date->format('d/m/Y');
+                                    }
+                                    
+                                    // Determinar el ícono según el tipo
+                                    $icon = 'bell';
+                                    
+                                    switch ($notification['type']) {
+                                        case 'transaction':
+                                            $icon = 'cart-check';
+                                            break;
+                                        case 'reservation':
+                                            $icon = 'calendar-check';
+                                            break;
+                                        case 'thank_you':
+                                            $icon = 'envelope-heart';
+                                            break;
+                                        case 'expiry':
+                                            $icon = 'alarm';
+                                            break;
+                                    }
+                                    ?>
+                                    <a href="<?php echo !empty($notification['link']) ? htmlspecialchars($notification['link']) : 'notifications.php'; ?>" class="dropdown-item notification-item <?php echo $notification['is_read'] ? '' : 'unread'; ?>">
+                                        <div class="d-flex">
+                                            <div class="me-2">
+                                                <i class="bi bi-<?php echo $icon; ?>"></i>
+                                            </div>
+                                            <div>
+                                                <div class="notification-title"><?php echo htmlspecialchars($notification['title']); ?></div>
+                                                <p class="mb-0 text-truncate" style="max-width: 250px;"><?php echo htmlspecialchars($notification['message']); ?></p>
+                                                <div class="notification-time"><?php echo $time; ?></div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                            
+                            <div class="notification-footer">
+                                <a href="notifications.php" class="btn btn-sm btn-primary">Ver todas</a>
+                                <?php if ($unreadCount > 0): ?>
+                                    <form method="post" action="notifications.php" class="d-inline">
+                                        <input type="hidden" name="action" value="mark_all_read">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Marcar como leídas</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </li>
+                    
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <?php echo htmlspecialchars($user['name'] . ' ' . $user['lastname']); ?>
@@ -94,19 +243,19 @@ $config = require_once __DIR__ . '/../config/config.php';
 
         <!-- Tarjetas de estadísticas -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="dashboard-stat blue">
                     <h3><?php echo is_array($myLists) ? count($myLists) : 0; ?></h3>
                     <p>Listas Creadas</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="dashboard-stat green">
                     <h3><?php echo count($transactions); ?></h3>
                     <p>Transacciones</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="dashboard-stat orange">
                     <h3>
                         <?php 
@@ -122,6 +271,12 @@ $config = require_once __DIR__ . '/../config/config.php';
                     <p>Total Recaudado</p>
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="dashboard-stat purple">
+                    <h3><?php echo $unreadCount; ?></h3>
+                    <p>Notificaciones</p>
+                </div>
+            </div>
         </div>
 
         <!-- Nav Tabs para organizar las funcionalidades -->
@@ -134,6 +289,16 @@ $config = require_once __DIR__ . '/../config/config.php';
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="transactions-tab" data-bs-toggle="tab" data-bs-target="#transactions" type="button" role="tab" aria-controls="transactions" aria-selected="false">
                     Historial de Transacciones
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link position-relative" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab" aria-controls="notifications" aria-selected="false">
+                    Notificaciones Recientes
+                    <?php if ($unreadCount > 0): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                            <?php echo $unreadCount; ?>
+                        </span>
+                    <?php endif; ?>
                 </button>
             </li>
         </ul>
@@ -237,6 +402,133 @@ $config = require_once __DIR__ . '/../config/config.php';
                     </div>
                 <?php else: ?>
                     <div class="alert alert-info">No tienes transacciones registradas.</div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Tab: Notificaciones Recientes -->
+            <div class="tab-pane fade" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Notificaciones Recientes</h3>
+                    <div>
+                        <a href="notifications.php" class="btn btn-primary">
+                            <i class="bi bi-bell"></i> Ver todas las notificaciones
+                        </a>
+                        <?php if ($unreadCount > 0): ?>
+                            <form method="post" action="notifications.php" class="d-inline">
+                                <input type="hidden" name="action" value="mark_all_read">
+                                <button type="submit" class="btn btn-outline-success">
+                                    <i class="bi bi-check2-all"></i> Marcar todas como leídas
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <?php if (empty($recentNotifications)): ?>
+                    <div class="alert alert-info">
+                        <i class="bi bi-bell-slash me-2"></i> No tienes notificaciones recientes.
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($recentNotifications as $notification): ?>
+                        <?php
+                        // Determinar el ícono según el tipo
+                        $icon = 'bell';
+                        $bgClass = 'light';
+                        
+                        switch ($notification['type']) {
+                            case 'transaction':
+                                $icon = 'cart-check';
+                                $bgClass = 'success';
+                                break;
+                            case 'reservation':
+                                $icon = 'calendar-check';
+                                $bgClass = 'info';
+                                break;
+                            case 'thank_you':
+                                $icon = 'envelope-heart';
+                                $bgClass = 'danger';
+                                break;
+                            case 'expiry':
+                                $icon = 'alarm';
+                                $bgClass = 'warning';
+                                break;
+                        }
+                        
+                        // Formatear la fecha
+                        $date = new DateTime($notification['created_at']);
+                        $now = new DateTime();
+                        $diff = $now->diff($date);
+                        
+                        if ($diff->days == 0) {
+                            if ($diff->h == 0) {
+                                if ($diff->i == 0) {
+                                    $time = "Hace unos segundos";
+                                } else {
+                                    $time = "Hace " . $diff->i . " minuto" . ($diff->i > 1 ? 's' : '');
+                                }
+                            } else {
+                                $time = "Hace " . $diff->h . " hora" . ($diff->h > 1 ? 's' : '');
+                            }
+                        } elseif ($diff->days == 1) {
+                            $time = "Ayer";
+                        } else {
+                            $time = $date->format('d/m/Y');
+                        }
+                        ?>
+                        <div class="card mb-3 border-<?php echo $notification['is_read'] ? 'secondary' : 'primary'; ?>">
+                            <div class="card-header bg-<?php echo $bgClass; ?> text-<?php echo $bgClass === 'light' ? 'dark' : 'white'; ?> d-flex justify-content-between align-items-center">
+                                <span>
+                                    <i class="bi bi-<?php echo $icon; ?> me-2"></i>
+                                    <?php 
+                                    switch ($notification['type']) {
+                                        case 'transaction': echo 'Compra'; break;
+                                        case 'reservation': echo 'Reserva'; break;
+                                        case 'thank_you': echo 'Agradecimiento'; break;
+                                        case 'expiry': echo 'Expiración'; break;
+                                        default: echo 'Sistema'; break;
+                                    }
+                                    ?>
+                                </span>
+                                <small><?php echo $time; ?></small>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title"><?php echo htmlspecialchars($notification['title']); ?></h5>
+                                <p class="card-text"><?php echo htmlspecialchars($notification['message']); ?></p>
+                                
+                                <div class="d-flex">
+                                    <?php if (!empty($notification['link'])): ?>
+                                        <a href="<?php echo htmlspecialchars($notification['link']); ?>" class="btn btn-sm btn-primary me-2">
+                                            <i class="bi bi-eye"></i> Ver detalles
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!$notification['is_read']): ?>
+                                        <form method="post" action="notifications.php" class="d-inline me-2">
+                                            <input type="hidden" name="action" value="mark_read">
+                                            <input type="hidden" name="id" value="<?php echo $notification['id']; ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-check2"></i> Marcar como leída
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                    
+                                    <form method="post" action="notifications.php" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?php echo $notification['id']; ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Estás seguro de eliminar esta notificación?')">
+                                            <i class="bi bi-trash"></i> Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    
+                    <div class="text-center mt-3">
+                        <a href="notifications.php" class="btn btn-primary">
+                            <i class="bi bi-bell"></i> Ver todas las notificaciones
+                        </a>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
