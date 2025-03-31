@@ -23,10 +23,6 @@ $auth->require('login.php');
 
 $user = $auth->user();
 
-// Instanciar controlador para obtener las categorías de regalos
-$glc = new GiftListController($pdo);
-$categories = $glc->getAllCategories();
-
 // Consultar los presets (temarios) creados por el administrador
 try {
     $stmt = $pdo->query("SELECT id, theme FROM preset_product_lists ORDER BY theme ASC");
@@ -92,7 +88,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty($presetProductId)) {
                                         $price = floatval($_POST['price'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity'][$index] ?? 0);
-                                        $category_id = intval($_POST['category_id'][$index] ?? null);
                                         
                                         // Si es un producto personalizado en lista predeterminada
                                         if ($presetProductId === 'custom') {
@@ -130,20 +125,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                             error_log("Procesando producto predeterminado: $name");
                                         }
                                         
-                                        // Insertar el producto en la lista con categoría
+                                        // Insertar el producto en la lista (eliminada la referencia a categoría)
                                         $result = $glc->addGift($gift_list_id, [
                                             "name"        => $name,
                                             "description" => $description,
                                             "price"       => $price,
-                                            "stock"       => $quantity,
-                                            "category_id" => $category_id
+                                            "stock"       => $quantity
                                         ]);
                                         
                                         if ($result) {
                                             $productsAdded++;
-                                            error_log("Producto añadido: $name, precio: $price, cantidad: $quantity, categoría: $category_id");
+                                            error_log("Producto añadido: $name, precio: $price, cantidad: $quantity");
                                         } else {
-                                            error_log("Error al añadir regalo: $name, precio: $price, cantidad: $quantity, categoría: $category_id");
+                                            error_log("Error al añadir regalo: $name, precio: $price, cantidad: $quantity");
                                         }
                                     }
                                 }
@@ -154,21 +148,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     if (!empty(trim($prod_name))) {
                                         $price = floatval($_POST['price_custom'][$index] ?? 0);
                                         $quantity = intval($_POST['quantity_custom'][$index] ?? 0);
-                                        $category_id = intval($_POST['category_id_custom'][$index] ?? null);
                                         
                                         $result = $glc->addGift($gift_list_id, [
                                             "name"        => trim($prod_name),
                                             "description" => "",
                                             "price"       => $price,
-                                            "stock"       => $quantity,
-                                            "category_id" => $category_id
+                                            "stock"       => $quantity
                                         ]);
                                         
                                         if ($result) {
                                             $productsAdded++;
-                                            error_log("Producto personalizado añadido: $prod_name, precio: $price, cantidad: $quantity, categoría: $category_id");
+                                            error_log("Producto personalizado añadido: $prod_name, precio: $price, cantidad: $quantity");
                                         } else {
-                                            error_log("Error al añadir regalo personalizado: $prod_name, precio: $price, cantidad: $quantity, categoría: $category_id");
+                                            error_log("Error al añadir regalo personalizado: $prod_name, precio: $price, cantidad: $quantity");
                                         }
                                     }
                                 }
@@ -404,16 +396,7 @@ $title = "Crear Lista de Regalos";
                                         <label class="form-label">Cantidad:</label>
                                         <input type="number" name="quantity_custom[]" class="form-control quantity-input" min="0" required>
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Categoría:</label>
-                                        <select name="category_id_custom[]" class="form-select">
-                                            <option value="">Sin categoría</option>
-                                            <?php foreach ($categories as $category): ?>
-                                                <option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-5">
                                         <label class="form-label">Total:</label>
                                         <div class="form-control bg-light total-field-custom">0.00</div>
                                     </div>
@@ -682,32 +665,20 @@ $title = "Crear Lista de Regalos";
             const div = document.createElement('div');
             div.className = "product-group border p-3 mb-3 rounded";
             
-            // Obtener las opciones de categoría
-            let categoryOptions = '<option value="">Sin categoría</option>';
-            <?php foreach ($categories as $category): ?>
-                categoryOptions += `<option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>`;
-            <?php endforeach; ?>
-            
             div.innerHTML = `
                 <div class="row">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label">Producto:</label>
                         <input type="hidden" name="product_id[]" value="${product.id}">
                         <input type="text" class="form-control" value="${product.name}" readonly>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">Precio:</label>
                         <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="${product.price || 0}" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">Cantidad:</label>
                         <input type="number" name="quantity[]" class="form-control" min="0" value="${product.stock || 1}" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Categoría:</label>
-                        <select name="category_id[]" class="form-select">
-                            ${categoryOptions}
-                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Total:</label>
@@ -728,32 +699,20 @@ $title = "Crear Lista de Regalos";
             div.className = "product-group border p-3 mb-3 rounded";
             div.setAttribute('data-custom', 'true');
             
-            // Obtener las opciones de categoría
-            let categoryOptions = '<option value="">Sin categoría</option>';
-            <?php foreach ($categories as $category): ?>
-                categoryOptions += `<option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>`;
-            <?php endforeach; ?>
-            
             div.innerHTML = `
                 <div class="row">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label">Producto:</label>
                         <input type="hidden" name="product_id[]" value="custom">
                         <input type="text" name="product_name_custom[${customProductCount}]" class="form-control" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">Precio:</label>
                         <input type="number" name="price[]" class="form-control" step="0.01" min="0" value="0" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">Cantidad:</label>
                         <input type="number" name="quantity[]" class="form-control" min="0" value="1" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Categoría:</label>
-                        <select name="category_id[]" class="form-select">
-                            ${categoryOptions}
-                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Total:</label>
@@ -782,12 +741,6 @@ $title = "Crear Lista de Regalos";
             newGroup.querySelectorAll('input').forEach(function(input) {
                 input.value = "";
             });
-            
-            // Resetear selección de categoría
-            const categorySelect = newGroup.querySelector('select');
-            if (categorySelect) {
-                categorySelect.selectedIndex = 0;
-            }
             
             // Reiniciar total
             newGroup.querySelector('.total-field-custom').textContent = "0.00";

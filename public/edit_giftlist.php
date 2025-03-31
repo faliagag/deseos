@@ -26,9 +26,6 @@ if (empty($id)) {
 // Instanciar el controlador y obtener la información de la lista
 $glc = new GiftListController($pdo);
 
-// Obtener categorías para los regalos
-$categories = $glc->getAllCategories();
-
 // Obtener la lista por ID
 $stmt = $pdo->prepare("SELECT * FROM gift_lists WHERE id = ?");
 $stmt->execute([$id]);
@@ -46,13 +43,7 @@ if ($list['user_id'] !== $_SESSION['user']['id'] && $_SESSION['user']['role'] !=
 }
 
 // Obtener los regalos de la lista
-$stmt = $pdo->prepare("
-    SELECT g.*, c.name as category_name 
-    FROM gifts g
-    LEFT JOIN gift_categories c ON g.category_id = c.id
-    WHERE g.gift_list_id = ?
-    ORDER BY g.id ASC
-");
+$stmt = $pdo->prepare("SELECT * FROM gifts WHERE gift_list_id = ? ORDER BY id ASC");
 $stmt->execute([$id]);
 $gifts = $stmt->fetchAll();
 
@@ -80,10 +71,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if (!empty($giftId)) {
                     $giftData = [
                         'name'        => $_POST['gift_name'][$index] ?? '',
-                        'description' => $_POST['gift_description'][$index] ?? '',
+                        // Eliminada la descripción
                         'price'       => floatval($_POST['gift_price'][$index] ?? 0),
                         'stock'       => intval($_POST['gift_stock'][$index] ?? 0),
-                        'category_id' => !empty($_POST['gift_category'][$index]) ? intval($_POST['gift_category'][$index]) : null
+                        // Eliminada la categoría
                     ];
                     
                     $glc->updateGift($giftId, $giftData);
@@ -97,10 +88,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if (!empty($name)) {
                     $newGiftData = [
                         'name'        => $name,
-                        'description' => $_POST['new_gift_description'][$index] ?? '',
+                        // Eliminada la descripción
                         'price'       => floatval($_POST['new_gift_price'][$index] ?? 0),
                         'stock'       => intval($_POST['new_gift_stock'][$index] ?? 0),
-                        'category_id' => !empty($_POST['new_gift_category'][$index]) ? intval($_POST['new_gift_category'][$index]) : null
+                        // Eliminada la categoría
                     ];
                     
                     $glc->addGift($id, $newGiftData);
@@ -126,13 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->execute([$id]);
         $list = $stmt->fetch();
         
-        $stmt = $pdo->prepare("
-            SELECT g.*, c.name as category_name 
-            FROM gifts g
-            LEFT JOIN gift_categories c ON g.category_id = c.id
-            WHERE g.gift_list_id = ?
-            ORDER BY g.id ASC
-        ");
+        $stmt = $pdo->prepare("SELECT * FROM gifts WHERE gift_list_id = ? ORDER BY id ASC");
         $stmt->execute([$id]);
         $gifts = $stmt->fetchAll();
     } else {
@@ -188,12 +173,6 @@ $config = require_once __DIR__ . '/../config/config.php';
             font-size: 0.9rem;
             display: none;
             margin-top: 5px;
-        }
-        
-        .badge-sold {
-            font-size: 0.7rem;
-            padding: 3px 6px;
-            margin-left: 5px;
         }
         
         .total-field {
@@ -377,11 +356,6 @@ $config = require_once __DIR__ . '/../config/config.php';
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <h5 class="mb-0">
                                             Regalo #<?php echo $index + 1; ?>
-                                            <?php if ($gift['sold'] > 0): ?>
-                                                <span class="badge bg-success badge-sold">
-                                                    <?php echo $gift['sold']; ?> vendido(s)
-                                                </span>
-                                            <?php endif; ?>
                                         </h5>
                                         <button type="button" class="btn btn-sm btn-outline-danger remove-gift-btn" 
                                                 data-gift-id="<?php echo $gift['id']; ?>">
@@ -398,39 +372,16 @@ $config = require_once __DIR__ . '/../config/config.php';
                                                    value="<?php echo htmlspecialchars($gift['name']); ?>" required>
                                         </div>
                                         
-                                        <div class="col-md-8 mb-2">
-                                            <label class="form-label">Descripción:</label>
-                                            <input type="text" name="gift_description[]" class="form-control" 
-                                                   value="<?php echo htmlspecialchars($gift['description']); ?>">
-                                        </div>
-                                        
-                                        <div class="col-md-3 mb-2">
+                                        <div class="col-md-4 mb-2">
                                             <label class="form-label">Precio:</label>
                                             <input type="number" name="gift_price[]" class="form-control price-input" 
                                                    step="0.01" min="0" value="<?php echo $gift['price']; ?>" required>
                                         </div>
                                         
-                                        <div class="col-md-3 mb-2">
+                                        <div class="col-md-4 mb-2">
                                             <label class="form-label">Stock:</label>
                                             <input type="number" name="gift_stock[]" class="form-control stock-input" 
                                                    min="0" value="<?php echo $gift['stock']; ?>" required>
-                                        </div>
-                                        
-                                        <div class="col-md-3 mb-2">
-                                            <label class="form-label">Vendidos:</label>
-                                            <input type="text" class="form-control" value="<?php echo $gift['sold']; ?>" readonly>
-                                        </div>
-                                        
-                                        <div class="col-md-3 mb-2">
-                                            <label class="form-label">Categoría:</label>
-                                            <select name="gift_category[]" class="form-select">
-                                                <option value="">Sin categoría</option>
-                                                <?php foreach ($categories as $category): ?>
-                                                    <option value="<?php echo $category['id']; ?>" <?php echo $gift['category_id'] == $category['id'] ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars($category['name']); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
                                         </div>
                                     </div>
                                     
@@ -511,31 +462,14 @@ $config = require_once __DIR__ . '/../config/config.php';
                     <input type="text" name="new_gift_name[]" class="form-control" required>
                 </div>
                 
-                <div class="col-md-8 mb-2">
-                    <label class="form-label">Descripción:</label>
-                    <input type="text" name="new_gift_description[]" class="form-control">
-                </div>
-                
-                <div class="col-md-3 mb-2">
+                <div class="col-md-4 mb-2">
                     <label class="form-label">Precio:</label>
                     <input type="number" name="new_gift_price[]" class="form-control new-price-input" step="0.01" min="0" value="0" required>
                 </div>
                 
-                <div class="col-md-3 mb-2">
+                <div class="col-md-4 mb-2">
                     <label class="form-label">Stock:</label>
                     <input type="number" name="new_gift_stock[]" class="form-control new-stock-input" min="0" value="1" required>
-                </div>
-                
-                <div class="col-md-6 mb-2">
-                    <label class="form-label">Categoría:</label>
-                    <select name="new_gift_category[]" class="form-select">
-                        <option value="">Sin categoría</option>
-                        <?php foreach ($categories as $category): ?>
-                            <option value="<?php echo $category['id']; ?>">
-                                <?php echo htmlspecialchars($category['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
                 </div>
             </div>
             
