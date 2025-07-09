@@ -7,7 +7,8 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../controllers/GiftListController.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-requireAuth();
+$auth = new Auth($pdo);
+$auth->require();
 
 $error = "";
 if ($_SERVER["REQUEST_METHOD"] === "POST") {

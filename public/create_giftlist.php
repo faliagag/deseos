@@ -15,7 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../controllers/GiftListController.php';
 require_once __DIR__ . '/../includes/helpers.php';
-require_once __DIR__ . '/../includes/Auth.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Verificar autenticación
 $auth = new Auth($pdo);
