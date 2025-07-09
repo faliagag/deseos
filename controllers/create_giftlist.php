@@ -1,5 +1,5 @@
 <?php
-// public/create_giftlist.php
+// Controlador para la página create_giftlist.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -8,7 +8,7 @@ require_once __DIR__ . '/../controllers/GiftListController.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 $auth = new Auth($pdo);
-$auth->require();
+$auth->require('login.php');
 
 $error = "";
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
