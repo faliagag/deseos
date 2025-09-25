@@ -1,155 +1,115 @@
 <?php
 /**
- * CONEXIÓN A BASE DE DATOS MEJORADA - VERSIÓN 2.1
- * Compatible con hosting compartido y nuevas funcionalidades
- * 
- * Credenciales actualizadas:
- * - Base de datos: misdeseo_web  
- * - Usuario: misdeseo_web
- * - Contraseña: Aliaga.2018
+ * CONEXIÓN SIMPLE Y ROBUSTA PARA HOSTING COMPARTIDO
+ * Base de datos: misdeseo_web
+ * Usuario: misdeseo_web
+ * Contraseña: Aliaga.2018
  */
 
-// Cargar configuración
-$config = require_once __DIR__ . '/../config/config.php';
-$dbConfig = $config['database'];
+// Configuración directa de base de datos (más confiable para hosting compartido)
+$DB_HOST = 'localhost';
+$DB_NAME = 'misdeseo_web';
+$DB_USER = 'misdeseo_web';
+$DB_PASS = 'Aliaga.2018';
+$DB_CHARSET = 'utf8mb4';
 
-// Construir DSN para PDO
-$host = $dbConfig['host'];
-$db = $dbConfig['name'];
-$user = $dbConfig['user'];
-$pass = $dbConfig['pass'];
-$charset = $dbConfig['charset'];
-
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+// DSN y opciones optimizadas para hosting compartido
+$dsn = "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=$DB_CHARSET";
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES => false,
-    PDO::ATTR_PERSISTENT => false, // Evitar conexiones persistentes en hosting compartido
-    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES $charset COLLATE {$charset}_unicode_ci"
+    PDO::ATTR_PERSISTENT => false // Nunca usar conexiones persistentes en hosting compartido
 ];
 
 /**
- * Función global getConnection() requerida por install.php y modelos
+ * Función getConnection() simplificada y robusta
  */
 function getConnection() {
-    global $dsn, $user, $pass, $options, $config;
+    global $dsn, $DB_USER, $DB_PASS, $options;
     
     try {
-        $pdo = new PDO($dsn, $user, $pass, $options);
+        $pdo = new PDO($dsn, $DB_USER, $DB_PASS, $options);
         
-        // Configurar zona horaria según configuración
-        if (isset($config['application']['timezone'])) {
-            date_default_timezone_set($config['application']['timezone']);
-            $pdo->exec("SET time_zone = '-03:00'"); // Chile UTC-3
-        }
+        // Configuraciones básicas
+        $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $pdo->exec("SET time_zone = '-03:00'"); // Zona horaria Chile
         
         return $pdo;
         
     } catch (PDOException $e) {
-        // Log error si el sistema de logs está disponible
-        if (file_exists(__DIR__ . '/ErrorHandler.php')) {
-            require_once __DIR__ . '/ErrorHandler.php';
-            ErrorHandler::logError("Error de conexión a base de datos", [
-                'message' => $e->getMessage(),
-                'host' => $host,
-                'database' => $db,
-                'user' => $user,
-                'code' => $e->getCode()
-            ]);
-        } else {
-            error_log("DB Connection Error: " . $e->getMessage());
+        // Log del error
+        $errorMessage = "[" . date('Y-m-d H:i:s') . "] DB Error: " . $e->getMessage() . "\n";
+        
+        // Intentar escribir log si el directorio existe
+        $logDir = __DIR__ . '/../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
         }
         
-        // En producción, mostrar error amigable
-        if (($config['application']['environment'] ?? 'development') === 'production') {
-            header('HTTP/1.1 503 Service Temporarily Unavailable');
-            header('Status: 503 Service Temporarily Unavailable');
-            header('Retry-After: 300');
-            
-            if (file_exists(__DIR__ . '/../templates/errors/database_error.html')) {
-                include __DIR__ . '/../templates/errors/database_error.html';
-            } else {
-                echo '<!DOCTYPE html><html><head><title>Error de Conexión</title></head><body style="font-family:Arial;text-align:center;padding:50px;"><h1>Servicio Temporalmente No Disponible</h1><p>Estamos experimentando problemas técnicos. Por favor, intente más tarde.</p></body></html>';
-            }
-            exit;
-        } else {
-            die("Error de conexión a la base de datos: " . $e->getMessage());
+        if (is_writable($logDir)) {
+            file_put_contents($logDir . '/connection_errors.log', $errorMessage, FILE_APPEND | LOCK_EX);
         }
+        
+        // Usar error_log como fallback
+        error_log($errorMessage);
+        
+        // Mostrar error detallado para debugging
+        $debugInfo = [
+            'Host: ' . $dsn,
+            'Usuario: ' . $DB_USER,
+            'Error: ' . $e->getMessage(),
+            'Código: ' . $e->getCode(),
+            'Archivo: ' . $e->getFile() . ':' . $e->getLine()
+        ];
+        
+        die("<h3>Error de Conexión a Base de Datos</h3><pre>" . implode("\n", $debugInfo) . "</pre><p><strong>Pasos para solucionarlo:</strong><br>1. Verificar que la base de datos 'misdeseo_web' existe<br>2. Verificar que el usuario 'misdeseo_web' tiene permisos<br>3. Verificar que la contraseña 'Aliaga.2018' es correcta<br>4. Contactar al proveedor de hosting si el problema persiste</p>");
     }
 }
 
-// Crear conexión global principal
+// Intentar crear conexión global
 try {
     $pdo = getConnection();
     
-    // Verificar que estamos conectados a la base de datos correcta
-    $dbCheck = $pdo->query("SELECT DATABASE() as current_db")->fetch(PDO::FETCH_ASSOC);
-    if ($dbCheck['current_db'] !== 'misdeseo_web') {
-        throw new Exception("Conectado a base de datos incorrecta: {$dbCheck['current_db']}. Esperado: misdeseo_web");
+    // Verificación adicional de la conexión
+    $test = $pdo->query("SELECT 'OK' as status")->fetch();
+    if ($test['status'] !== 'OK') {
+        throw new Exception("La conexión no responde correctamente");
     }
     
 } catch (Exception $e) {
-    // Cargar manejador de errores si está disponible
-    if (file_exists(__DIR__ . '/ErrorHandler.php')) {
-        require_once __DIR__ . '/ErrorHandler.php';
-        ErrorHandler::logError("Error de conexión crítica", [
-            'message' => $e->getMessage(),
-            'file' => __FILE__,
-            'line' => __LINE__
-        ]);
-    }
+    // Si falla la conexión global, registrar y continuar
+    $errorMessage = "[" . date('Y-m-d H:i:s') . "] Global Connection Failed: " . $e->getMessage() . "\n";
+    error_log($errorMessage);
     
-    // Error crítico - detener ejecución
-    if (($config['application']['debug'] ?? false) === true) {
-        die("Error crítico: " . $e->getMessage());
-    } else {
-        die("Error en la conexión a la base de datos. Por favor, contacte al administrador.");
-    }
+    // En este caso, $pdo será null y cada archivo deberá crear su propia conexión
+    $pdo = null;
 }
 
 /**
- * Función mejorada para ejecutar consultas con logging
+ * Función simplificada para ejecutar consultas
  */
 function executeQuery($query, $params = [], $returnType = 'fetchAll') {
-    global $pdo, $config;
+    global $pdo;
+    
+    // Si no hay conexión global, crear una nueva
+    if ($pdo === null) {
+        $pdo = getConnection();
+    }
     
     try {
-        $startTime = microtime(true);
         $stmt = $pdo->prepare($query);
-        $success = $stmt->execute($params);
-        $executionTime = microtime(true) - $startTime;
+        $stmt->execute($params);
         
-        // Log consultas lentas si está habilitado
-        if (($config['logging']['log_slow_queries'] ?? false) && 
-            $executionTime > ($config['logging']['slow_query_threshold'] ?? 1.0)) {
-            
-            if (class_exists('ErrorHandler')) {
-                ErrorHandler::logError("Consulta lenta detectada", [
-                    'query' => $query,
-                    'execution_time' => $executionTime,
-                    'params' => $params
-                ], 'WARNING');
-            }
-        }
-        
-        if (!$success) {
-            throw new PDOException('Query execution failed');
-        }
-        
-        // Retornar según el tipo solicitado
         switch ($returnType) {
             case 'fetch':
                 return $stmt->fetch(PDO::FETCH_ASSOC);
             case 'fetchAll':
-            case 'all':
                 return $stmt->fetchAll(PDO::FETCH_ASSOC);
             case 'count':
                 return $stmt->rowCount();
             case 'lastId':
                 return $pdo->lastInsertId();
-            case 'statement':
-                return $stmt;
             case 'bool':
                 return true;
             default:
@@ -157,31 +117,14 @@ function executeQuery($query, $params = [], $returnType = 'fetchAll') {
         }
         
     } catch (PDOException $e) {
-        // Log error
-        if (class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Error en consulta SQL", [
-                'query' => $query,
-                'params' => $params,
-                'message' => $e->getMessage(),
-                'code' => $e->getCode(),
-                'file' => debug_backtrace()[1]['file'] ?? 'unknown',
-                'line' => debug_backtrace()[1]['line'] ?? 'unknown'
-            ]);
-        } else {
-            error_log("SQL Error: " . $e->getMessage() . " | Query: " . $query);
-        }
+        $errorMessage = "[" . date('Y-m-d H:i:s') . "] SQL Error: " . $e->getMessage() . " | Query: " . $query . "\n";
+        error_log($errorMessage);
         
-        // En modo debug, relanzar excepción
-        if (($config['application']['debug'] ?? false) === true) {
-            throw $e;
-        }
-        
-        // En producción, retornar false o array vacío
+        // Retornar valor por defecto según el tipo
         switch ($returnType) {
             case 'fetch':
                 return false;
             case 'fetchAll':
-            case 'all':
                 return [];
             case 'count':
             case 'lastId':
@@ -195,175 +138,38 @@ function executeQuery($query, $params = [], $returnType = 'fetchAll') {
 }
 
 /**
- * Ejecutar transacción con múltiples consultas
- */
-function executeTransaction($queries) {
-    global $pdo;
-    
-    try {
-        $pdo->beginTransaction();
-        $results = [];
-        
-        foreach ($queries as $queryData) {
-            $query = $queryData['sql'];
-            $params = $queryData['params'] ?? [];
-            $returnType = $queryData['return'] ?? 'bool';
-            
-            $result = executeQuery($query, $params, $returnType);
-            if ($result === false && $returnType !== 'bool') {
-                throw new Exception("Error en transacción: consulta fallida");
-            }
-            
-            $results[] = $result;
-        }
-        
-        $pdo->commit();
-        return ['success' => true, 'results' => $results];
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        
-        if (class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Error en transacción", [
-                'message' => $e->getMessage(),
-                'queries_count' => count($queries)
-            ]);
-        }
-        
-        return ['success' => false, 'error' => $e->getMessage()];
-    }
-}
-
-/**
- * Verificar si una tabla existe
+ * Verificar si una tabla existe (método simple)
  */
 function tableExists($tableName) {
-    global $pdo;
     try {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+        $pdo = getConnection();
+        $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
         $stmt->execute([$tableName]);
-        return $stmt->fetchColumn() > 0;
+        return $stmt->rowCount() > 0;
     } catch (Exception $e) {
         return false;
     }
 }
 
 /**
- * Verificar integridad de la base de datos
+ * Test de conexión simple
  */
-function checkDatabaseIntegrity() {
-    $requiredTables = [
-        'users', 'gift_lists', 'gifts', 'gift_categories',
-        'transactions', 'payment_logs', 'testimonials', 'payouts',
-        'faqs', 'admin_activity_logs', 'system_config',
-        'analytics_events', 'notification_logs', 'user_activity'
-    ];
-    
-    $missingTables = [];
-    foreach ($requiredTables as $table) {
-        if (!tableExists($table)) {
-            $missingTables[] = $table;
-        }
-    }
-    
-    return [
-        'complete' => empty($missingTables),
-        'missing_tables' => $missingTables,
-        'existing_tables' => array_diff($requiredTables, $missingTables)
-    ];
-}
-
-/**
- * Verificar salud de la conexión
- */
-function checkDatabaseHealth() {
-    global $pdo;
+function testConnection() {
     try {
-        $stmt = $pdo->query("SELECT 1 as health_check");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result['health_check'] === 1;
-    } catch (PDOException $e) {
-        if (class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Database health check failed", [
-                'message' => $e->getMessage()
-            ]);
-        }
-        return false;
-    }
-}
-
-/**
- * Optimizar tablas (ejecutar periódicamente)
- */
-function optimizeTables() {
-    global $pdo;
-    try {
-        // Obtener todas las tablas de la base de datos
-        $stmt = $pdo->query("SHOW TABLES");
-        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        foreach ($tables as $table) {
-            $pdo->exec("OPTIMIZE TABLE `$table`");
-        }
-        
-        return true;
-    } catch (Exception $e) {
-        if (class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Error optimizando tablas", [
-                'message' => $e->getMessage()
-            ]);
-        }
-        return false;
-    }
-}
-
-/**
- * Limpiar datos antiguos (mantenimiento automático)
- */
-function cleanupOldData() {
-    global $pdo, $config;
-    
-    $retentionDays = $config['analytics']['retention_days'] ?? 365;
-    
-    try {
-        $cleanupQueries = [
-            "DELETE FROM analytics_events WHERE created_at < DATE_SUB(NOW(), INTERVAL $retentionDays DAY)",
-            "DELETE FROM payment_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL $retentionDays DAY)",
-            "DELETE FROM notification_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY) AND status = 'sent'",
-            "DELETE FROM page_visits WHERE visited_at < DATE_SUB(NOW(), INTERVAL 180 DAY)"
+        $pdo = getConnection();
+        $result = $pdo->query("SELECT 'Conexión exitosa' as message, NOW() as timestamp, DATABASE() as db_name")->fetch();
+        return [
+            'success' => true,
+            'message' => $result['message'],
+            'timestamp' => $result['timestamp'],
+            'database' => $result['db_name']
         ];
-        
-        $totalDeleted = 0;
-        foreach ($cleanupQueries as $query) {
-            $stmt = $pdo->prepare($query);
-            $stmt->execute();
-            $totalDeleted += $stmt->rowCount();
-        }
-        
-        if ($totalDeleted > 0 && class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Limpieza de datos completada", [
-                'deleted_records' => $totalDeleted
-            ], 'INFO');
-        }
-        
-        return $totalDeleted;
-        
     } catch (Exception $e) {
-        if (class_exists('ErrorHandler')) {
-            ErrorHandler::logError("Error en limpieza de datos", [
-                'message' => $e->getMessage()
-            ]);
-        }
-        return 0;
-    }
-}
-
-// Auto-inicializar manejador de errores si existe
-if (file_exists(__DIR__ . '/ErrorHandler.php')) {
-    require_once __DIR__ . '/ErrorHandler.php';
-    if (!defined('ERROR_HANDLER_INITIALIZED')) {
-        ErrorHandler::init(__DIR__ . '/../logs');
-        define('ERROR_HANDLER_INITIALIZED', true);
+        return [
+            'success' => false,
+            'error' => $e->getMessage(),
+            'code' => $e->getCode()
+        ];
     }
 }
 ?>
