@@ -1,8 +1,8 @@
 <?php
 /**
- * CONFIGURACIÓN PRINCIPAL - VERSIÓN 2.1
- * Actualizada con eventos y características de milistaderegalos.cl
- * ⚠️ IMPORTANTE: Mover credenciales a variables de entorno en producción
+ * CONFIGURACIÓN PRINCIPAL - VERSIÓN 2.1 COMPLETA
+ * Actualizada con todas las funcionalidades estilo milistaderegalos.cl
+ * ⚠️ IMPORTANTE: Mover credenciales sensibles a variables de entorno en producción
  */
 
 return [
@@ -12,7 +12,8 @@ return [
         'version' => '2.1',
         'url' => 'https://tu-dominio.com',
         'email' => 'contacto@tu-dominio.com',
-        'timezone' => 'America/Santiago'
+        'timezone' => 'America/Santiago',
+        'locale' => 'es_CL'
     ],
     
     // ⚠️ TEMPORAL - Mover a .env en producción
@@ -36,52 +37,62 @@ return [
             'aniversario' => [
                 'name' => 'Aniversario',
                 'icon' => '💕',
-                'color' => '#e91e63'
+                'color' => '#e91e63',
+                'description' => 'Celebra un año más juntos'
             ],
             'babyshower' => [
                 'name' => 'Babyshower',
                 'icon' => '👶',
-                'color' => '#ffb74d'
+                'color' => '#ffb74d',
+                'description' => 'Bienvenida al nuevo bebé'
             ],
             'bautismo' => [
                 'name' => 'Bautismo',
                 'icon' => '🙏',
-                'color' => '#90caf9'
+                'color' => '#90caf9',
+                'description' => 'Primer sacramento'
             ],
             'bodas_de_oro' => [
                 'name' => 'Bodas de oro',
                 'icon' => '👑',
-                'color' => '#ffd700'
+                'color' => '#ffd700',
+                'description' => '50 años de amor'
             ],
             'celebracion' => [
                 'name' => 'Celebración',
                 'icon' => '🎉',
-                'color' => '#4caf50'
+                'color' => '#4caf50',
+                'description' => 'Cualquier motivo para celebrar'
             ],
             'colecta' => [
                 'name' => 'Colecta',
                 'icon' => '🤝',
-                'color' => '#9c27b0'
+                'color' => '#9c27b0',
+                'description' => 'Recaudación solidaria'
             ],
             'cumpleanos' => [
                 'name' => 'Cumpleaños',
                 'icon' => '🎂',
-                'color' => '#f44336'
+                'color' => '#f44336',
+                'description' => 'Un año más de vida'
             ],
             'depto_shower' => [
                 'name' => 'Depto shower',
                 'icon' => '🏠',
-                'color' => '#607d8b'
+                'color' => '#607d8b',
+                'description' => 'Nuevo hogar, nuevos sueños'
             ],
             'matrimonio' => [
                 'name' => 'Matrimonio',
                 'icon' => '💒',
-                'color' => '#e91e63'
+                'color' => '#e91e63',
+                'description' => 'El día más especial'
             ],
             'graduacion' => [
                 'name' => 'Graduación',
                 'icon' => '🎓',
-                'color' => '#3f51b5'
+                'color' => '#3f51b5',
+                'description' => 'Logro académico'
             ]
         ]
     ],
@@ -91,6 +102,7 @@ return [
         'schedule' => 'biweekly_wednesday',
         'cutoff_time' => '14:00',
         'cutoff_day' => 'monday',
+        'minimum_amount' => 1000, // CLP
         'calendar_2025' => [
             'Enero' => ['8 de Enero', '22 de Enero'],
             'Febrero' => ['5 de Febrero', '19 de Febrero'],
@@ -113,14 +125,16 @@ return [
         'public_key' => 'YOUR_MERCADOPAGO_PUBLIC_KEY',
         'sandbox' => true, // Cambiar a false en producción
         'webhook_secret' => 'YOUR_WEBHOOK_SECRET',
-        'fee_percentage' => 10.0
+        'fee_percentage' => 10.0,
+        'enabled' => true
     ],
     
     // Configuración de Transbank
     'transbank' => [
         'commerce_code' => 'YOUR_TRANSBANK_COMMERCE_CODE',
         'api_key' => 'YOUR_TRANSBANK_API_KEY',
-        'environment' => 'integration' // 'production' para producción
+        'environment' => 'integration', // 'production' para producción
+        'enabled' => true
     ],
     
     // Configuración de notificaciones
@@ -139,15 +153,22 @@ return [
             'token' => 'your_twilio_token',
             'from' => '+56912345678',
             'enabled' => false
+        ],
+        'auto_send' => [
+            'purchase_confirmation' => true,
+            'payout_notification' => true,
+            'event_reminder' => true,
+            'testimonial_request' => true
         ]
     ],
     
     // Sistema de fees del 10% (estilo milistaderegalos.cl)
     'fees' => [
-        'percentage' => 10,
-        'include_in_payment' => true, // Fee cobrado al comprador, no al festejado
-        'description' => 'Incluye cargos de procesamiento, Transbank y servicio',
-        'currency' => 'CLP'
+        'user_commission' => 0, // Festejado recibe 100%
+        'buyer_commission' => 10, // Compradores pagan 10% extra
+        'currency' => 'CLP',
+        'include_in_payment' => true, // Fee cobrado al comprador
+        'description' => 'El festejado recibe el 100% del monto. Los compradores pagan un 10% extra que incluye costos de plataforma y Transbank.'
     ],
     
     // Configuración de archivos
@@ -159,7 +180,14 @@ return [
         ],
         'qr_codes' => [
             'path' => 'uploads/qr-codes/',
-            'size' => 200
+            'size' => 300,
+            'format' => 'png',
+            'quality' => 90
+        ],
+        'gallery' => [
+            'path' => 'uploads/gallery/',
+            'max_images' => 10,
+            'thumbnail_size' => [200, 200]
         ]
     ],
     
@@ -170,7 +198,9 @@ return [
         'rate_limiting' => [
             'login_attempts' => 5,
             'lockout_duration' => 900 // 15 minutos
-        ]
+        ],
+        'csrf_protection' => true,
+        'force_https' => false // Cambiar a true en producción
     ],
     
     // Configuración de búsqueda (estilo milistaderegalos.cl)
@@ -179,7 +209,9 @@ return [
         'enable_filters' => true,
         'max_results' => 50,
         'highlight_matches' => true,
-        'min_characters' => 2
+        'min_characters' => 2,
+        'enable_autocomplete' => true,
+        'cache_results' => true
     ],
     
     // Testimonios dinámicos
@@ -187,7 +219,10 @@ return [
         'enabled' => true,
         'moderation_required' => true,
         'max_per_page' => 6,
-        'auto_approve_5_stars' => true
+        'auto_approve_5_stars' => false,
+        'min_length' => 50,
+        'max_length' => 500,
+        'auto_request_days_after_event' => 7
     ],
     
     // FAQs dinámicas
@@ -196,22 +231,112 @@ return [
         'categories' => [
             'general' => 'Preguntas Generales',
             'pagos' => 'Pagos y Depósitos', 
-            'listas' => 'Listas de Regalos'
+            'listas' => 'Listas de Regalos',
+            'cuenta' => 'Mi Cuenta'
         ],
-        'auto_expand_first' => true
+        'auto_expand_first' => true,
+        'enable_search' => true
     ],
     
     // Sistema de QR codes
     'qr_codes' => [
         'enabled' => true,
-        'size' => 200,
-        'format' => 'png'
+        'size' => 300,
+        'format' => 'png',
+        'margin' => 10,
+        'foreground_color' => '#000000',
+        'background_color' => '#FFFFFF',
+        'auto_generate' => true
+    ],
+    
+    // Compartir en redes sociales
+    'sharing' => [
+        'whatsapp_enabled' => true,
+        'facebook_enabled' => true,
+        'twitter_enabled' => true,
+        'email_enabled' => true,
+        'copy_link_enabled' => true,
+        'qr_enabled' => true,
+        'default_message' => '¡Mira mi lista de regalos! 🎁'
+    ],
+    
+    // Información de contacto y redes
+    'contact' => [
+        'email' => 'contacto@tudominio.cl',
+        'phone' => '+56 9 1234 5678',
+        'whatsapp' => '+56912345678',
+        'address' => 'Santiago, Chile',
+        'social' => [
+            'instagram' => '@tuinstagram',
+            'facebook' => 'tupagina',
+            'twitter' => '@tutwitter'
+        ]
+    ],
+    
+    // Estadísticas públicas
+    'stats' => [
+        'show_public_stats' => true,
+        'cache_duration' => 3600, // 1 hora
+        'display' => [
+            'total_lists' => true,
+            'happy_users' => true,
+            'total_delivered' => true,
+            'satisfaction_rate' => true
+        ]
+    ],
+    
+    // Sistema de cupones
+    'coupons' => [
+        'enabled' => true,
+        'allow_multiple' => false,
+        'case_sensitive' => false
+    ],
+    
+    // Sistema de referidos
+    'referrals' => [
+        'enabled' => false,
+        'commission_percentage' => 5,
+        'minimum_payout' => 10000
+    ],
+    
+    // Meta tags para redes sociales
+    'seo' => [
+        'site_name' => 'Mi Lista de Regalos',
+        'default_image' => '/assets/images/og-image.jpg',
+        'twitter_handle' => '@milistaderegalos',
+        'keywords' => 'lista de regalos, regalos, eventos, matrimonio, cumpleaños, baby shower'
+    ],
+    
+    // Analytics
+    'analytics' => [
+        'enabled' => true,
+        'google_analytics_id' => 'UA-XXXXXXXXX-X',
+        'facebook_pixel_id' => '',
+        'track_events' => true
     ],
     
     // Límites del sistema
     'limits' => [
         'max_lists_per_user' => 20,
-        'max_gifts_per_list' => 100
+        'max_gifts_per_list' => 100,
+        'max_gallery_images' => 10,
+        'max_upload_size' => 10, // MB
+        'session_timeout' => 120 // minutos
+    ],
+    
+    // Mantenimiento
+    'maintenance' => [
+        'mode' => false,
+        'message' => 'Estamos realizando mejoras. Volveremos pronto.',
+        'allowed_ips' => []
+    ],
+    
+    // Logs
+    'logging' => [
+        'enabled' => true,
+        'level' => 'error', // debug, info, warning, error
+        'path' => 'logs/',
+        'max_files' => 30
     ]
 ];
 
