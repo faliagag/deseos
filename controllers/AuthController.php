@@ -40,9 +40,9 @@ class AuthController {
             $name = sanitize($data['name']);
             $lastname = sanitize($data['lastname']);
             $phone = sanitize($data['phone']);
-            $bank = sanitize($data['bank'] ?? '');
+            $bank_name = sanitize($data['bank_name'] ?? '');
             $account_type = sanitize($data['account_type'] ?? '');
-            $account_number = sanitize($data['account_number'] ?? '');
+            $bank_account = sanitize($data['bank_account'] ?? '');
             $rut = sanitize($data['rut']);
             $email = sanitize($data['email']);
             $password = $data['password']; // No sanitizar la contraseña
@@ -72,12 +72,20 @@ class AuthController {
             // Insertar nuevo usuario en la base de datos
             $stmt = $this->pdo->prepare("
                 INSERT INTO users 
-                (name, lastname, phone, bank, account_type, account_number, rut, email, password, role, created_at) 
+                (name, lastname, phone, bank_name, account_type, bank_account, rut, email, password, role, created_at) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', NOW())
             ");
 
             $result = $stmt->execute([
-                $name, $lastname, $phone, $bank, $account_type, $account_number, $rut, $email, $hashedPassword
+                $name, 
+                $lastname, 
+                $phone, 
+                $bank_name, 
+                $account_type, 
+                $bank_account, 
+                $rut, 
+                $email, 
+                $hashedPassword
             ]);
 
             if ($result) {
