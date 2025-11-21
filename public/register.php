@@ -115,9 +115,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $errors['phone'] = "El teléfono debe contener solo números y el signo +";
     }
     
-    // Validar banco (opcional pero debe ser de la lista)
-    if (!empty($_POST['bank']) && !in_array($_POST['bank'], $bancos_chilenos)) {
-        $errors['bank'] = "Por favor seleccione un banco de la lista";
+    // Validar banco (opcional pero debe ser de la lista) - CORREGIDO: bank_name
+    if (!empty($_POST['bank_name']) && !in_array($_POST['bank_name'], $bancos_chilenos)) {
+        $errors['bank_name'] = "Por favor seleccione un banco de la lista";
     }
     
     // Validar tipo de cuenta (opcional pero debe ser de la lista)
@@ -329,19 +329,19 @@ function formatearRut($rut) {
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Datos bancarios -->
+                            <!-- Datos bancarios - CORREGIDOS -->
                             <div class="col-md-4">
-                                <label for="bank" class="form-label">Banco</label>
-                                <select name="bank" id="bank" class="form-select <?php echo isset($errors['bank']) ? 'is-invalid' : ''; ?>">
+                                <label for="bank_name" class="form-label">Banco</label>
+                                <select name="bank_name" id="bank_name" class="form-select <?php echo isset($errors['bank_name']) ? 'is-invalid' : ''; ?>">
                                     <option value="">Seleccione un banco (opcional)</option>
                                     <?php foreach ($bancos_chilenos as $banco): ?>
-                                        <option value="<?php echo htmlspecialchars($banco); ?>" <?php echo (isset($data['bank']) && $data['bank'] === $banco) ? 'selected' : ''; ?>>
+                                        <option value="<?php echo htmlspecialchars($banco); ?>" <?php echo (isset($data['bank_name']) && $data['bank_name'] === $banco) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($banco); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <?php if (isset($errors['bank'])): ?>
-                                    <div class="invalid-feedback"><?php echo $errors['bank']; ?></div>
+                                <?php if (isset($errors['bank_name'])): ?>
+                                    <div class="invalid-feedback"><?php echo $errors['bank_name']; ?></div>
                                 <?php endif; ?>
                             </div>
                             
@@ -361,11 +361,11 @@ function formatearRut($rut) {
                             </div>
                             
                             <div class="col-md-4">
-                                <label for="account_number" class="form-label">Número de Cuenta</label>
-                                <input type="text" name="account_number" id="account_number" class="form-control <?php echo isset($errors['account_number']) ? 'is-invalid' : ''; ?>" 
-                                    value="<?php echo htmlspecialchars($data['account_number'] ?? ''); ?>">
-                                <?php if (isset($errors['account_number'])): ?>
-                                    <div class="invalid-feedback"><?php echo $errors['account_number']; ?></div>
+                                <label for="bank_account" class="form-label">Número de Cuenta</label>
+                                <input type="text" name="bank_account" id="bank_account" class="form-control <?php echo isset($errors['bank_account']) ? 'is-invalid' : ''; ?>" 
+                                    value="<?php echo htmlspecialchars($data['bank_account'] ?? ''); ?>">
+                                <?php if (isset($errors['bank_account'])): ?>
+                                    <div class="invalid-feedback"><?php echo $errors['bank_account']; ?></div>
                                 <?php endif; ?>
                             </div>
                             
